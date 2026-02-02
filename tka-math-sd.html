@@ -13,10 +13,7 @@
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // Mengekspos modul ke window agar bisa diakses script utama
         window.firebaseModules = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp };
-        
-        // Memicu event custom bahwa module sudah siap
         window.dispatchEvent(new Event('firebaseModulesLoaded'));
     </script>
 
@@ -49,9 +46,11 @@
             body * { visibility: hidden; }
             #result-screen, #result-screen * { visibility: visible; }
             #result-screen { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; box-shadow: none !important; border: none !important; background: white !important; }
-            #result-screen button { display: none !important; }
+            #result-screen button, #leaderboard-section { display: none !important; } /* Sembunyikan tombol & leaderboard saat print */
             #final-score { color: black !important; border: 2px solid black; border-radius: 10px; padding: 10px; }
+            #discussion-section { display: block !important; margin-top: 20px; } /* Pastikan pembahasan muncul */
             header, footer, #custom-modal, #status-indicator { display: none !important; }
+            .page-break { page-break-inside: avoid; border: 1px solid #ccc; margin-bottom: 10px; padding: 10px; border-radius: 5px; }
         }
     </style>
 </head>
@@ -68,12 +67,10 @@
                 </div>
             </div>
             <div class="flex items-center gap-4">
-                <!-- Status Indicator -->
                 <div id="status-indicator" class="flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 border border-gray-200">
                     <div id="status-dot" class="w-2 h-2 rounded-full bg-gray-400"></div>
                     <span id="status-text" class="text-xs font-bold text-gray-500">Connecting...</span>
                 </div>
-
                 <div id="user-info-display" class="hidden text-right">
                     <div id="display-name" class="font-bold text-sm text-blue-700">Peserta</div>
                     <div id="display-code" class="text-xs text-slate-500">Kode: -</div>
@@ -228,7 +225,7 @@
                 <div class="text-sm opacity-90">Benar: <span id="correct-count">0</span> dari 30 Soal</div>
             </div>
 
-            <div class="mt-8 text-left">
+            <div id="leaderboard-section" class="mt-8 text-left">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="font-bold text-xl text-slate-700 flex items-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
@@ -255,9 +252,19 @@
                 </div>
             </div>
 
-            <div class="mt-8 flex gap-4 justify-center">
-                 <button onclick="window.print()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-2 px-6 rounded-lg transition">Cetak Hasil</button>
+            <!-- Tombol Aksi -->
+            <div class="mt-8 flex gap-4 justify-center print:hidden">
+                 <button onclick="document.getElementById('discussion-section').classList.toggle('hidden');" class="bg-blue-100 border border-blue-300 hover:bg-blue-200 text-blue-700 font-bold py-2 px-6 rounded-lg transition">Lihat Pembahasan</button>
+                 <button onclick="window.print()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-2 px-6 rounded-lg transition">Cetak Hasil & Pembahasan</button>
                 <button onclick="location.reload()" class="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-6 rounded-lg transition">Keluar / Login Ulang</button>
+            </div>
+
+            <!-- Bagian Pembahasan (Hidden by default) -->
+            <div id="discussion-section" class="hidden mt-8 text-left border-t-2 border-slate-200 pt-8">
+                <h3 class="font-bold text-2xl text-slate-800 mb-6 text-center">Pembahasan Soal</h3>
+                <div id="discussion-content" class="space-y-6">
+                    <!-- Konten Pembahasan akan di-inject lewat JS -->
+                </div>
             </div>
         </div>
 
@@ -274,6 +281,7 @@
 
     <footer class="bg-white border-t border-slate-200 py-8 mt-12">
         <div class="max-w-4xl mx-auto px-4 text-center">
+            <div class="flex flex-col items-center">
                 <p class="text-xs text-slate-500 leading-relaxed">
                     Pengembang: <strong class="text-slate-800 text-sm block mt-1">Yoyon Sugiyono, S.Pd., M.Pd., Gr.</strong>
                     <span class="block mt-1 font-medium text-slate-600">GPD Komunitas Belajar.id Kab. Sampang &bull; Guru Kelas di UPTD SDN Margantoko 2</span>
@@ -288,9 +296,6 @@
 
     <!-- APP LOGIC -->
     <script>
-        // --- 0. KONFIGURASI FIREBASE (WAJIB DIISI UNTUK GITHUB PAGES) ---
-        // Ganti nilai di bawah ini dengan konfigurasi dari Firebase Console Project Anda
-        // Jika dibiarkan kosong, aplikasi akan berjalan dalam "Mode Offline" di GitHub.
         const MANUAL_CONFIG = {
             apiKey: "AIzaSyBrW9-IE0yZc-aCp3IjwbCViaILGQbHUj8",
             authDomain: "tka-math-sd.firebaseapp.com",
@@ -300,71 +305,47 @@
             appId: "1:33767745712:web:4a43a1144ad2203b78b375"
         };
 
-        // --- 1. FIREBASE SETUP & AUTH ---
         let db, auth;
-        let appId = 'tka-online-app-v1'; // ID Aplikasi statis
+        let appId = 'tka-online-app-v1';
         const COLLECTION_NAME = 'tka_scores';
 
         async function initFirebase() {
             const statusDot = document.getElementById('status-dot');
             const statusText = document.getElementById('status-text');
 
-            // Tunggu modul dimuat
             if (!window.firebaseModules) {
                 await new Promise(resolve => window.addEventListener('firebaseModulesLoaded', resolve, { once: true }));
             }
 
             try {
-                const { initializeApp, getAuth, signInAnonymously, getFirestore, collection, addDoc, serverTimestamp } = window.firebaseModules;
-                
+                const { initializeApp, getAuth, signInAnonymously, getFirestore } = window.firebaseModules;
                 let firebaseConfig = null;
-
-                // Prioritas 1: Lingkungan Canvas (Preview)
                 if (typeof window.__firebase_config !== 'undefined' && window.__firebase_config) {
                     firebaseConfig = JSON.parse(window.__firebase_config);
                     appId = typeof window.__app_id !== 'undefined' ? window.__app_id : appId;
-                } 
-                // Prioritas 2: Konfigurasi Manual User (GitHub Pages)
-                // Kita cek variable MANUAL_CONFIG yang sudah Anda isi di atas
-                else if (typeof MANUAL_CONFIG !== 'undefined' && MANUAL_CONFIG.apiKey) {
+                } else if (typeof MANUAL_CONFIG !== 'undefined' && MANUAL_CONFIG.apiKey) {
                     firebaseConfig = MANUAL_CONFIG;
                 }
-
-                if (!firebaseConfig) {
-                    throw new Error("Konfigurasi Firebase tidak ditemukan.");
-                }
-                
+                if (!firebaseConfig) throw new Error("Konfigurasi Firebase tidak ditemukan.");
                 const firebaseApp = initializeApp(firebaseConfig);
                 auth = getAuth(firebaseApp);
                 db = getFirestore(firebaseApp);
-
-                // Autentikasi Anonim (Guest)
                 await signInAnonymously(auth);
-                
                 console.log("Firebase Connected. User ID:", auth.currentUser?.uid);
                 statusDot.className = "w-2 h-2 rounded-full bg-green-500";
                 statusText.innerText = "Online";
                 statusText.className = "text-xs font-bold text-green-500";
-
-                if (typeof app !== 'undefined' && app.initCredentials) {
-                    app.initCredentials();
-                }
-                
+                if (typeof app !== 'undefined' && app.initCredentials) app.initCredentials();
             } catch (e) {
                 console.warn("Masuk Mode Offline:", e.message);
                 app.isOffline = true;
-                
                 statusDot.className = "w-2 h-2 rounded-full bg-orange-500";
                 statusText.innerText = "Mode Offline";
                 statusText.className = "text-xs font-bold text-orange-500";
-                
-                if (typeof app !== 'undefined' && app.initCredentials) {
-                    app.initCredentials();
-                }
+                if (typeof app !== 'undefined' && app.initCredentials) app.initCredentials();
             }
         }
 
-        // --- 2. GENERATORS (MATH LOGIC) ---
         const Utils = {
             randInt: (min, max) => Math.floor(Math.random() * (max - min + 1)) + min,
             randChoice: (arr) => arr[Math.floor(Math.random() * arr.length)],
@@ -378,7 +359,7 @@
             fractionOps: () => {
                 const levels = ['LOTS', 'MOTS', 'HOTS'];
                 const level = Utils.randChoice(levels);
-                let qStr = "", story = "", question = "", correctStr = "";
+                let qStr = "", story = "", question = "", correctStr = "", explanation = "";
                 let opts = new Set();
                 const d1 = Utils.randChoice([2, 3, 4, 5, 6]);
                 const d2 = Utils.randChoice([2, 3, 4, 5, 6]);
@@ -389,12 +370,21 @@
                     const isAdd = Math.random() > 0.5;
                     let resN = isAdd ? n1*d2 + n2*d1 : n1*d2 - n2*d1, resD = d1*d2;
                     let opStr = isAdd ? '+' : '-';
-                    if (!isAdd && resN < 0) { resN = n2*d1 - n1*d2; opStr = '-'; qStr = `${Utils.formatFraction(n2,d2)} ${opStr} ${Utils.formatFraction(n1,d1)}`; }
-                    else { qStr = `${Utils.formatFraction(n1,d1)} ${opStr} ${Utils.formatFraction(n2,d2)}`; }
+                    let stepOp = isAdd ? 'Penjumlahan' : 'Pengurangan';
+                    if (!isAdd && resN < 0) { 
+                        resN = n2*d1 - n1*d2; opStr = '-'; 
+                        qStr = `${Utils.formatFraction(n2,d2)} ${opStr} ${Utils.formatFraction(n1,d1)}`; 
+                        explanation = `Samakan penyebut kedua pecahan menjadi KPK dari ${d2} dan ${d1}, yaitu ${d1*d2}.<br>(${n2}×${d1})/(${d2}×${d1}) - (${n1}×${d2})/(${d1}×${d2}) = ${n2*d1}/${d1*d2} - ${n1*d2}/${d1*d2} = ${(n2*d1)-(n1*d2)}/${d1*d2}.`;
+                    }
+                    else { 
+                        qStr = `${Utils.formatFraction(n1,d1)} ${opStr} ${Utils.formatFraction(n2,d2)}`; 
+                        explanation = `Samakan penyebut kedua pecahan menjadi KPK dari ${d1} dan ${d2}, yaitu ${d1*d2}.<br>(${n1}×${d2})/(${d1}×${d2}) ${opStr} (${n2}×${d1})/(${d2}×${d1}) = ${n1*d2}/${d1*d2} ${opStr} ${n2*d1}/${d1*d2} = ${resN}/${d1*d2}.`;
+                    }
                     const [sN, sD] = Utils.simplifyFraction(resN, resD);
                     correctStr = Utils.formatFraction(sN, sD);
                     question = `Hasil dari ${qStr} adalah...`;
                     story = "Hitunglah operasi pecahan berikut.";
+                    explanation += `<br>Sederhanakan pecahan ${resN}/${d1*d2} menjadi ${correctStr}.`;
                 } else if (level === 'MOTS') {
                     const isAdd = Math.random() > 0.5;
                     let resN, resD = d1*d2;
@@ -404,6 +394,7 @@
                         resN = n1*d2 + n2*d1;
                         story = `Ibu memiliki ${ctx.obj} sebanyak ${Utils.formatFraction(n1,d1)} ${ctx.unit}. Kemudian Ibu ${ctx.add} sebanyak ${Utils.formatFraction(n2,d2)} ${ctx.unit}.`;
                         question = `Berapa total ${ctx.obj} Ibu sekarang?`;
+                        explanation = `Total = Awal + Tambahan = ${Utils.formatFraction(n1,d1)} + ${Utils.formatFraction(n2,d2)}.<br>Samakan penyebut: ${n1*d2}/${d1*d2} + ${n2*d1}/${d1*d2} = ${(n1*d2)+(n2*d1)}/${d1*d2}.`;
                     } else {
                         let v1 = n1/d1, v2 = n2/d2;
                         let bigN=n1, bigD=d1, smN=n2, smD=d2;
@@ -411,21 +402,24 @@
                         resN = bigN*smD - smN*bigD; resD = bigD*smD;
                         story = `Awalnya ada ${ctx.obj} sebanyak ${Utils.formatFraction(bigN,bigD)} ${ctx.unit}. Lalu ${ctx.sub} sebanyak ${Utils.formatFraction(smN,smD)} ${ctx.unit}.`;
                         question = `Berapa sisa ${ctx.obj} sekarang?`;
+                        explanation = `Sisa = Awal - Digunakan = ${Utils.formatFraction(bigN,bigD)} - ${Utils.formatFraction(smN,smD)}.<br>Samakan penyebut: ${bigN*smD}/${bigD*smD} - ${smN*bigD}/${bigD*smD} = ${(bigN*smD)-(smN*bigD)}/${bigD*smD}.`;
                     }
                     const [sN, sD] = Utils.simplifyFraction(resN, resD);
                     correctStr = Utils.formatFraction(sN, sD) + ` ${ctx.unit}`;
+                    explanation += `<br>Hasil disederhanakan menjadi: ${correctStr}.`;
                 } else {
                     let v1 = n1/d1, v2 = n2/d2;
                     let diffN, diffD = d1*d2;
                     let name1 = "Andi", name2 = "Budi";
+                    let winner = v1 > v2 ? name1 : name2;
                     if(v1 > v2) { diffN = n1*d2 - n2*d1; } else { diffN = n2*d1 - n1*d2; }
                     const [sN, sD] = Utils.simplifyFraction(diffN, diffD);
                     story = `${name1} memiliki tali sepanjang ${Utils.formatFraction(n1,d1)} meter, sedangkan ${name2} memiliki tali ${Utils.formatFraction(n2,d2)} meter.`;
                     question = `Siapa yang memiliki tali lebih panjang dan berapa selisihnya?`;
-                    let winner = v1 > v2 ? name1 : name2;
                     correctStr = `${winner}, ${Utils.formatFraction(sN, sD)} m`;
                     opts.add(`${winner === name1 ? name2 : name1}, ${Utils.formatFraction(sN, sD)} m`);
                     opts.add(`${winner}, ${Utils.formatFraction(sN+1, sD)} m`);
+                    explanation = `Bandingkan pecahan: ${name1} (${n1}/${d1} = ${n1*d2}/${d1*d2}) dan ${name2} (${n2}/${d2} = ${n2*d1}/${d1*d2}).<br>Yang lebih besar adalah ${winner}.<br>Selisihnya: Besar - Kecil = ${diffN}/${diffD} = ${Utils.formatFraction(sN, sD)} m.`;
                 }
                 opts.add(correctStr);
                 let safety = 0;
@@ -445,14 +439,14 @@
                     }
                     opts.add(fakeVal);
                 }
-                return { cat: "Bilangan", level: level, q: `<div class="mb-4 text-base font-normal text-slate-600 bg-slate-50 p-4 rounded-lg border-l-4 border-blue-400 italic">"${story}"</div><div class="font-bold text-lg text-slate-800">${question}</div>`, ans: correctStr, opts: Array.from(opts) };
+                return { cat: "Bilangan", level: level, q: `<div class="mb-4 text-base font-normal text-slate-600 bg-slate-50 p-4 rounded-lg border-l-4 border-blue-400 italic">"${story}"</div><div class="font-bold text-lg text-slate-800">${question}</div>`, ans: correctStr, opts: Array.from(opts), exp: explanation };
             },
             geometry: () => {
                 const levels = ['LOTS', 'MOTS', 'HOTS'];
                 const level = Utils.randChoice(levels);
                 const p = Utils.randInt(6, 12);
                 const l = Utils.randInt(3, 8);
-                let correctStr = "", story = "", question = "", vis = "";
+                let correctStr = "", story = "", question = "", vis = "", explanation = "";
                 let opts = new Set();
                 if (level === 'LOTS') {
                     const isArea = Math.random() > 0.5;
@@ -461,6 +455,7 @@
                     question = `Hitunglah ${isArea ? 'luas' : 'keliling'} bangun tersebut!`;
                     correctStr = ans + (isArea ? " cm²" : " cm");
                     vis = `<div style="width:${p*10}px;height:${l*10}px;border:2px solid #3b82f6;background:#dbeafe;display:flex;align-items:center;justify-content:center;font-size:10px;">${p}x${l}</div>`;
+                    explanation = isArea ? `Rumus Luas = Panjang × Lebar<br>L = ${p} × ${l} = ${ans} cm²` : `Rumus Keliling = 2 × (Panjang + Lebar)<br>K = 2 × (${p} + ${l}) = 2 × ${p+l} = ${ans} cm`;
                 } else if (level === 'MOTS') {
                     const isArea = Math.random() > 0.5;
                     const ans = isArea ? p*l : 2*(p+l);
@@ -468,12 +463,14 @@
                     story = `Budi ingin membuat ${ctx.t} dengan ukuran panjang ${p} cm dan lebar ${l} cm.`;
                     question = `Berapakah ${ctx.a} yang dibutuhkan?`;
                     correctStr = ans + " " + ctx.u;
+                    explanation = isArea ? `Untuk mencari ${ctx.a}, gunakan rumus Luas: p × l.<br>${p} × ${l} = ${ans} ${ctx.u}.` : `Untuk mencari ${ctx.a}, gunakan rumus Keliling: 2(p+l).<br>2 × (${p} + ${l}) = ${ans} ${ctx.u}.`;
                 } else {
                     const area = p * l;
                     story = `Sebuah kebun berbentuk persegi panjang memiliki Luas ${area} m². Jika panjangnya ${p} m.`;
                     question = `Berapakah lebar kebun tersebut?`;
                     correctStr = `${l} m`;
                     opts.add(`${l+2} m`); opts.add(`${p} m`); opts.add(`${Math.floor(area/2)} m`);
+                    explanation = `Diketahui Luas = ${area}, Panjang = ${p}.<br>Rumus Luas = p × l, maka Lebar = Luas ÷ Panjang.<br>Lebar = ${area} ÷ ${p} = ${l} m.`;
                 }
                 opts.add(correctStr);
                 while(opts.size < 4) {
@@ -481,7 +478,7 @@
                     const unit = correctStr.includes('²') ? "cm²" : (correctStr.includes('m') ? "m" : "cm");
                     opts.add(val + " " + unit);
                 }
-                return { cat: "Geometri", level: level, q: `<div class="mb-4 text-base font-normal text-slate-600 bg-green-50 p-4 rounded-lg border-l-4 border-green-400 italic">"${story}"</div><div class="font-bold text-lg text-slate-800">${question}</div>`, ans: correctStr, opts: Array.from(opts), vis: vis };
+                return { cat: "Geometri", level: level, q: `<div class="mb-4 text-base font-normal text-slate-600 bg-green-50 p-4 rounded-lg border-l-4 border-green-400 italic">"${story}"</div><div class="font-bold text-lg text-slate-800">${question}</div>`, ans: correctStr, opts: Array.from(opts), vis: vis, exp: explanation };
             },
             data: () => {
                 const levels = ['LOTS', 'MOTS', 'HOTS'];
@@ -490,25 +487,29 @@
                 const labels = ["Jan", "Feb", "Mar", "Apr"];
                 const max = Math.max(...data);
                 const min = Math.min(...data);
-                let question = "", ans = "";
+                let question = "", ans = "", explanation = "";
                 let opts = new Set();
                 if (level === 'LOTS') {
                     question = "Bulan apa yang memiliki nilai tertinggi?";
                     ans = labels[data.indexOf(max)];
                     labels.forEach(l => opts.add(l));
+                    explanation = `Lihat diagram batang tertinggi. Nilai tertinggi adalah ${max} pada bulan ${ans}.`;
                 } else if (level === 'MOTS') {
                     question = "Berapa jumlah total data pada bulan Januari dan Maret?";
                     ans = (data[0] + data[2]).toString();
+                    explanation = `Nilai Jan = ${data[0]}, Nilai Mar = ${data[2]}.<br>Jumlah = ${data[0]} + ${data[2]} = ${ans}.`;
                 } else {
                     if(Math.random() > 0.5) {
                         question = "Berapa selisih antara nilai tertinggi dan terendah?";
                         ans = (max - min).toString();
+                        explanation = `Nilai tertinggi = ${max}, Nilai terendah = ${min}.<br>Selisih = ${max} - ${min} = ${ans}.`;
                     } else {
                         question = "Jika rata-rata target adalah 40, bulan apa saja yang di atas target?";
                         const passed = labels.filter((_,i) => data[i] > 40);
                         ans = passed.length > 0 ? passed.join(", ") : "Tidak ada";
                         if(ans === "Tidak ada") { opts.add("Jan, Feb"); opts.add("Semua Bulan"); opts.add("Mar"); } 
                         else { opts.add(passed[0] || "Jan"); }
+                        explanation = `Cari bulan dengan nilai > 40.<br>Data: Jan(${data[0]}), Feb(${data[1]}), Mar(${data[2]}), Apr(${data[3]}).<br>Yang > 40: ${ans}.`;
                     }
                 }
                 if(level !== 'LOTS') {
@@ -521,11 +522,10 @@
                     html += `<div class="flex-1 flex flex-col justify-end group relative h-full"><div class="w-full bg-indigo-500 rounded-t" style="height:${heightPercent}%"><span class="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs font-bold text-indigo-700">${v}</span></div></div>`;
                 });
                 html += `</div><div class="flex text-xs mt-2 gap-4 text-slate-600 font-bold w-full max-w-md mx-auto">${labels.map(l=>`<div class="flex-1 text-center">${l}</div>`).join('')}</div></div>`;
-                return { cat: "Data", level: level, q: `<div class="mb-4 text-base font-normal text-slate-600 bg-white p-2 rounded-lg border border-slate-200">Data Penjualan Bulanan:</div>${html}<div class="mt-6 font-bold text-lg text-slate-800 border-t pt-4">${question}</div>`, ans: ans, opts: Array.from(opts), vis: null };
+                return { cat: "Data", level: level, q: `<div class="mb-4 text-base font-normal text-slate-600 bg-white p-2 rounded-lg border border-slate-200">Data Penjualan Bulanan:</div>${html}<div class="mt-6 font-bold text-lg text-slate-800 border-t pt-4">${question}</div>`, ans: ans, opts: Array.from(opts), vis: null, exp: explanation };
             }
         };
 
-        // --- 3. APP STATE & LOGIC ---
         const app = {
             user: { code: '', name: '', gender: '', dob: '', token: '' },
             questions: [],
@@ -702,7 +702,36 @@
                 app.showModal("Apakah Anda yakin ingin menyelesaikan ujian ini? Jawaban tidak dapat diubah setelah ini.", 'confirm', async () => {
                     clearInterval(app.timer);
                     let correct = 0;
-                    app.questions.forEach((q, i) => { if(app.answers[i] === q.ans) correct++; });
+                    
+                    const discussionContent = document.getElementById('discussion-content');
+                    discussionContent.innerHTML = ''; // Reset discussion
+
+                    app.questions.forEach((q, i) => { 
+                        const isCorrect = app.answers[i] === q.ans;
+                        if(isCorrect) correct++; 
+                        
+                        // Generate Discussion Item HTML
+                        const item = document.createElement('div');
+                        item.className = `page-break mb-6 p-4 border rounded-lg ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`;
+                        item.innerHTML = `
+                            <div class="font-bold text-slate-700 mb-2 flex justify-between">
+                                <span>Soal ${i+1} (${q.level})</span>
+                                <span class="${isCorrect ? 'text-green-600' : 'text-red-600'} text-xs font-bold uppercase border px-2 rounded ${isCorrect ? 'border-green-300 bg-green-100' : 'border-red-300 bg-red-100'}">${isCorrect ? 'Benar' : 'Salah'}</span>
+                            </div>
+                            <div class="mb-3 text-sm text-slate-800">${q.q}</div>
+                            ${q.vis ? `<div class="mb-3 flex justify-center">${q.vis}</div>` : ''}
+                            <div class="text-sm grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
+                                <p class="bg-white p-2 rounded border border-slate-200"><strong>Jawaban Anda:</strong> <span class="${isCorrect ? 'text-green-700 font-bold' : 'text-red-700 font-bold'}">${app.answers[i] || 'Tidak dijawab'}</span></p>
+                                <p class="bg-white p-2 rounded border border-slate-200"><strong>Kunci Jawaban:</strong> <span class="text-green-700 font-bold">${q.ans}</span></p>
+                            </div>
+                            <div class="mt-2 p-3 bg-white rounded border border-slate-300 text-sm text-slate-600 shadow-sm">
+                                <strong class="text-blue-600 block mb-1">Pembahasan:</strong>
+                                ${q.exp}
+                            </div>
+                        `;
+                        discussionContent.appendChild(item);
+                    });
+
                     const score = Math.round((correct/30) * 100);
                     document.getElementById('quiz-screen').classList.add('hidden');
                     document.getElementById('timer-display').classList.add('hidden');
@@ -723,17 +752,12 @@
                 if(!db || !auth.currentUser) return;
                 try {
                     const { collection, addDoc, serverTimestamp } = window.firebaseModules;
-                    
-                    // Logic untuk path collection:
-                    // Jika di Canvas (ada __app_id), gunakan path panjang. Jika manual, gunakan path pendek.
                     let collectionRef;
                     if (typeof window.__app_id !== 'undefined') {
                          collectionRef = collection(db, 'artifacts', appId, 'public', 'data', COLLECTION_NAME);
                     } else {
-                         // Path lebih sederhana untuk GitHub/Localhost user
                          collectionRef = collection(db, COLLECTION_NAME);
                     }
-                    
                     await addDoc(collectionRef, { 
                         code: app.user.code, 
                         name: app.user.name, 
@@ -746,14 +770,12 @@
             loadLeaderboard: () => {
                 if(!db) return;
                 const { collection, query, orderBy, limit, onSnapshot } = window.firebaseModules;
-                
                 let collectionRef;
                 if (typeof window.__app_id !== 'undefined') {
                      collectionRef = collection(db, 'artifacts', appId, 'public', 'data', COLLECTION_NAME);
                 } else {
                      collectionRef = collection(db, COLLECTION_NAME);
                 }
-
                 const q = query(collectionRef, orderBy("score", "desc"), limit(20));
                 document.getElementById('loading-leaderboard').classList.remove('hidden');
                 onSnapshot(q, (snapshot) => {
