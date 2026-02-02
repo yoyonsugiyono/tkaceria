@@ -291,12 +291,14 @@
     <script>
         // --- KONFIGURASI USER UNTUK DEPLOYMENT (OPSIONAL) ---
         // Jika Anda deploy ke GitHub dan ingin fitur online aktif, isi config ini dari Firebase Console.
-        const USER_FIREBASE_CONFIG = {
-            // apiKey: "AIzaSy...",
-            // authDomain: "...",
-            // projectId: "...",
-            // ...
-        };
+        const firebaseConfig = {
+  apiKey: "AIzaSyBrW9-IE0yZc-aCp3IjwbCViaILGQbHUj8",
+  authDomain: "tka-math-sd.firebaseapp.com",
+  projectId: "tka-math-sd",
+  storageBucket: "tka-math-sd.firebasestorage.app",
+  messagingSenderId: "33767745712",
+  appId: "1:33767745712:web:4a43a1144ad2203b78b375"
+};
 
         // --- 1. FIREBASE SETUP & AUTH ---
         let db, auth, appId;
