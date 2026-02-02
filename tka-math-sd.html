@@ -279,14 +279,14 @@
         // --- 0. KONFIGURASI FIREBASE (WAJIB DIISI UNTUK GITHUB PAGES) ---
         // Ganti nilai di bawah ini dengan konfigurasi dari Firebase Console Project Anda
         // Jika dibiarkan kosong, aplikasi akan berjalan dalam "Mode Offline" di GitHub.
-        const firebaseConfig = {
-  apiKey: "AIzaSyBrW9-IE0yZc-aCp3IjwbCViaILGQbHUj8",
-  authDomain: "tka-math-sd.firebaseapp.com",
-  projectId: "tka-math-sd",
-  storageBucket: "tka-math-sd.firebasestorage.app",
-  messagingSenderId: "33767745712",
-  appId: "1:33767745712:web:4a43a1144ad2203b78b375"
-};
+        const MANUAL_CONFIG = {
+            apiKey: "AIzaSyBrW9-IE0yZc-aCp3IjwbCViaILGQbHUj8",
+            authDomain: "tka-math-sd.firebaseapp.com",
+            projectId: "tka-math-sd",
+            storageBucket: "tka-math-sd.firebasestorage.app",
+            messagingSenderId: "33767745712",
+            appId: "1:33767745712:web:4a43a1144ad2203b78b375"
+        };
 
         // --- 1. FIREBASE SETUP & AUTH ---
         let db, auth;
@@ -313,12 +313,13 @@
                     appId = typeof window.__app_id !== 'undefined' ? window.__app_id : appId;
                 } 
                 // Prioritas 2: Konfigurasi Manual User (GitHub Pages)
-                else if (YOUR_FIREBASE_CONFIG.apiKey) {
-                    firebaseConfig = YOUR_FIREBASE_CONFIG;
+                // Kita cek variable MANUAL_CONFIG yang sudah Anda isi di atas
+                else if (typeof MANUAL_CONFIG !== 'undefined' && MANUAL_CONFIG.apiKey) {
+                    firebaseConfig = MANUAL_CONFIG;
                 }
 
                 if (!firebaseConfig) {
-                    throw new Error("Konfigurasi Firebase tidak ditemukan. Silakan isi variable YOUR_FIREBASE_CONFIG di dalam script.");
+                    throw new Error("Konfigurasi Firebase tidak ditemukan.");
                 }
                 
                 const firebaseApp = initializeApp(firebaseConfig);
