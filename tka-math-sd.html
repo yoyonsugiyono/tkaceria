@@ -7,29 +7,57 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
     
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // Mengekspos modul ke window agar bisa diakses script utama
+        window.firebaseModules = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp };
+        
+        // Memicu event custom bahwa module sudah siap
+        window.dispatchEvent(new Event('firebaseModulesLoaded'));
+    </script>
+
     <style>
         body { font-family: 'Nunito', sans-serif; background-color: #f1f5f9; }
         .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        
+        /* Animations */
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        
+        /* Math Fraction Styling */
         .fraction { display: inline-block; text-align: center; vertical-align: middle; margin: 0 0.2em; font-size: 1.1em; font-weight: bold; color: #2563eb; }
         .fraction > span { display: block; padding: 0.1em; }
         .fraction span.numerator { border-bottom: 2px solid currentColor; }
+        .fraction span.denominator { border-top: 0px; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+
+        /* Loader */
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+        /* PRINT STYLES */
         @media print {
             body { background: white !important; color: black !important; }
             body * { visibility: hidden; }
             #result-screen, #result-screen * { visibility: visible; }
             #result-screen { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; box-shadow: none !important; border: none !important; background: white !important; }
-            #result-screen button, .no-print { display: none !important; }
-            header, footer, #status-indicator { display: none !important; }
+            #result-screen button { display: none !important; }
+            #final-score { color: black !important; border: 2px solid black; border-radius: 10px; padding: 10px; }
+            header, footer, #custom-modal, #status-indicator { display: none !important; }
         }
     </style>
 </head>
 <body class="text-slate-800 min-h-screen flex flex-col bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]">
 
+    <!-- Header -->
     <header class="bg-white shadow-md border-b border-blue-100 sticky top-0 z-20">
         <div class="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
             <div class="flex items-center gap-3">
@@ -40,20 +68,26 @@
                 </div>
             </div>
             <div class="flex items-center gap-4">
+                <!-- Status Indicator -->
                 <div id="status-indicator" class="flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 border border-gray-200">
                     <div id="status-dot" class="w-2 h-2 rounded-full bg-gray-400"></div>
                     <span id="status-text" class="text-xs font-bold text-gray-500">Connecting...</span>
                 </div>
+
                 <div id="user-info-display" class="hidden text-right">
                     <div id="display-name" class="font-bold text-sm text-blue-700">Peserta</div>
                     <div id="display-code" class="text-xs text-slate-500">Kode: -</div>
                 </div>
-                <div id="timer-display" class="hidden font-mono font-bold text-xl text-red-600 bg-red-50 px-3 py-1 rounded-md border border-red-200 shadow-inner">60:00</div>
+                <div id="timer-display" class="hidden font-mono font-bold text-xl text-red-600 bg-red-50 px-3 py-1 rounded-md border border-red-200 shadow-inner">
+                    60:00
+                </div>
             </div>
         </div>
     </header>
 
+    <!-- Main Content -->
     <main class="flex-grow p-4 flex flex-col items-center justify-center min-h-[80vh]">
+        
         <!-- 1. LOGIN SCREEN -->
         <div id="login-screen" class="w-full max-w-md glass-panel p-8 rounded-2xl shadow-xl border border-white fade-in">
             <div class="text-center mb-6">
@@ -63,235 +97,472 @@
                     </svg>
                 </div>
                 <h2 class="text-2xl font-bold text-slate-800">Login Peserta</h2>
-                <p class="text-slate-500 text-sm">Masuk menggunakan kredensial otomatis.</p>
+                <p class="text-slate-500 text-sm">Gunakan kredensial berikut untuk masuk.</p>
             </div>
-            <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6 text-center">
+
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6 text-center relative overflow-hidden">
+                <div class="absolute top-0 right-0 bg-blue-500 text-white text-[10px] px-2 py-1 rounded-bl-lg font-bold">AUTO</div>
                 <div class="grid grid-cols-2 gap-4 divide-x divide-blue-200">
                     <div>
                         <div class="text-xs text-slate-500 uppercase font-bold mb-1">Kode Peserta</div>
-                        <div id="gen-code" class="text-2xl font-mono font-black text-blue-800">...</div>
+                        <div id="gen-code" class="text-2xl font-mono font-black text-blue-800 tracking-tight">...</div>
                     </div>
                     <div>
                         <div class="text-xs text-slate-500 uppercase font-bold mb-1">Sandi</div>
-                        <div id="gen-pass" class="text-2xl font-mono font-black text-blue-800">...</div>
+                        <div id="gen-pass" class="text-2xl font-mono font-black text-blue-800 tracking-tight">...</div>
                     </div>
                 </div>
             </div>
-            <button onclick="app.handleLogin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg transition transform active:scale-95">MASUK</button>
+
+            <button onclick="app.handleLogin()" id="btn-login" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg transition transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                MASUK
+            </button>
+            <div class="text-center mt-4">
+                <p class="text-xs text-slate-400">Kode dan sandi di-generate otomatis oleh aplikasi.</p>
+            </div>
         </div>
 
-        <!-- 2. DATA ENTRY -->
+        <!-- 2. DATA ENTRY & CONFIRMATION SCREEN -->
         <div id="confirmation-screen" class="hidden w-full max-w-4xl glass-panel p-8 rounded-2xl shadow-xl border border-white fade-in">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6 border-b pb-2">Konfirmasi Data Diri</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6 border-b pb-2 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Data Diri Peserta
+            </h2>
+            
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div class="space-y-4">
                     <div>
                         <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Kode Peserta</label>
-                        <input type="text" id="input-conf-code" class="w-full px-4 py-2 rounded-lg bg-slate-100 border font-bold" readonly>
+                        <input type="text" id="input-conf-code" class="w-full px-4 py-2 rounded-lg bg-slate-100 border border-slate-300 text-slate-600 font-bold" readonly>
                     </div>
                     <div>
                         <label class="block text-sm font-bold text-slate-700 mb-1">Nama Peserta <span class="text-red-500">*</span></label>
-                        <input type="text" id="input-name" class="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Nama Lengkap">
+                        <input type="text" id="input-name" class="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="Masukkan nama lengkap">
                     </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-bold text-slate-700 mb-1">Gender <span class="text-red-500">*</span></label>
-                            <select id="input-gender" class="w-full px-4 py-2 rounded-lg border bg-white outline-none">
-                                <option value="">-- Pilih --</option>
-                                <option value="Laki-laki">Laki-laki</option>
-                                <option value="Perempuan">Perempuan</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-bold text-slate-700 mb-1">Tgl Lahir <span class="text-red-500">*</span></label>
-                            <input type="date" id="input-dob" class="w-full px-4 py-2 rounded-lg border outline-none">
-                        </div>
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-1">Jenis Kelamin <span class="text-red-500">*</span></label>
+                        <select id="input-gender" class="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white">
+                            <option value="">-- Pilih Jenis Kelamin --</option>
+                            <option value="Laki-laki">Laki-laki</option>
+                            <option value="Perempuan">Perempuan</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-1">Tanggal Lahir <span class="text-red-500">*</span></label>
+                        <input type="date" id="input-dob" class="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
                     </div>
                 </div>
+
                 <div class="flex flex-col justify-center gap-6">
-                    <div class="bg-yellow-50 p-4 rounded-xl border border-yellow-200 text-center">
-                        <div class="text-xs text-yellow-700 font-bold mb-2">TOKEN AKTIF</div>
-                        <div id="token-display" class="text-4xl font-mono font-black text-slate-800 tracking-widest bg-white py-3 rounded-lg border">-----</div>
+                    <div class="bg-yellow-50 p-4 rounded-xl border border-yellow-200 text-center shadow-sm">
+                        <div class="text-xs text-yellow-700 font-bold mb-2">TOKEN SERVER (AKTIF)</div>
+                        <div id="token-display" class="text-4xl font-mono font-black text-slate-800 tracking-widest bg-white px-2 py-3 rounded-lg border border-slate-200 select-all">
+                            -----
+                        </div>
                     </div>
-                    <input type="text" id="input-token" class="w-full px-4 py-3 rounded-lg border-2 border-slate-300 focus:border-blue-500 text-center text-xl font-mono tracking-widest uppercase" placeholder="SALIN TOKEN">
+                    <div class="bg-white p-4 rounded-xl border-2 border-slate-100">
+                         <label class="block text-sm font-bold text-slate-700 mb-2 text-center">Salin Token Ujian <span class="text-red-500">*</span></label>
+                         <input type="text" id="input-token" class="w-full px-4 py-3 rounded-lg border-2 border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition font-mono text-center text-xl tracking-widest uppercase placeholder:text-slate-300 placeholder:text-sm" placeholder="KETIK TOKEN DI SINI">
+                         <p class="text-xs text-slate-400 mt-2 text-center">Ketik ulang token yang tampil di atas untuk memulai.</p>
+                    </div>
                 </div>
             </div>
+
             <div class="mt-8 flex gap-3 border-t pt-6">
-                <button onclick="location.reload()" class="flex-1 bg-white border py-3 rounded-xl font-bold">Batal</button>
-                <button onclick="app.confirmData()" class="flex-[2] bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-lg">MULAI UJIAN</button>
+                <button onclick="location.reload()" class="flex-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-3 rounded-xl transition">
+                    Batal
+                </button>
+                <button onclick="app.confirmData()" class="flex-[2] bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-lg transition transform active:scale-95">
+                    KONFIRMASI & MULAI
+                </button>
             </div>
         </div>
 
         <!-- 3. QUIZ SCREEN -->
-        <div id="quiz-screen" class="hidden w-full max-w-5xl glass-panel rounded-2xl shadow-xl border overflow-hidden fade-in flex flex-col md:flex-row">
-            <div class="flex-grow p-6 md:p-10 border-r border-slate-200">
-                <div class="flex justify-between items-center mb-6">
-                    <div id="category-badge" class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-bold uppercase">Matematika</div>
-                    <div id="question-progress" class="font-bold text-slate-500">Soal 1/30</div>
+        <div id="quiz-screen" class="hidden w-full max-w-4xl glass-panel rounded-2xl shadow-xl border border-white overflow-hidden fade-in flex flex-col">
+            <div class="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <span id="category-badge" class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold uppercase">Matematika</span>
+                    <span id="level-badge" class="bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider">Loading...</span>
                 </div>
-                <div id="question-text" class="text-xl text-slate-800 mb-8 leading-relaxed"></div>
-                <div id="visual-container" class="mb-8 hidden flex justify-center"></div>
-                <div id="options-container" class="grid grid-cols-1 gap-4"></div>
-                <div class="flex justify-between mt-10 pt-6 border-t">
-                    <button onclick="app.prevQuestion()" id="btn-prev" class="px-6 py-3 rounded-xl bg-slate-100 font-bold disabled:opacity-30">Kembali</button>
-                    <button onclick="app.nextQuestion()" id="btn-next" class="px-6 py-3 rounded-xl bg-blue-600 text-white font-bold shadow-md">Berikutnya</button>
-                </div>
+                <div class="text-sm font-bold text-slate-600" id="question-progress">Soal 1/30</div>
             </div>
-            <div class="w-full md:w-72 bg-slate-50 p-6 flex flex-col">
-                <h3 class="text-center text-xs font-bold text-slate-400 uppercase mb-4">Navigasi Soal</h3>
-                <div id="nav-grid" class="grid grid-cols-5 gap-2 mb-6"></div>
-                <button onclick="app.finishQuiz()" class="mt-auto w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl">SELESAI</button>
+
+            <div class="flex flex-col md:flex-row">
+                <div class="flex-grow p-6 md:p-10">
+                    <div id="question-text" class="text-lg text-slate-800 mb-6 leading-relaxed"></div>
+                    <div id="visual-container" class="mb-6 w-full flex justify-center bg-white rounded-xl p-4 hidden border border-slate-200 shadow-inner"></div>
+                    <div id="options-container" class="grid grid-cols-1 gap-3"></div>
+                    <div class="flex justify-between items-center mt-10 pt-6 border-t border-slate-100">
+                        <button onclick="app.prevQuestion()" id="btn-prev" class="flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                            Soal Sebelumnya
+                        </button>
+                        <button onclick="app.nextQuestion()" id="btn-next" class="flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition shadow-md hover:shadow-lg">
+                            Soal Berikutnya
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="w-full md:w-64 bg-slate-50 border-l border-slate-200 p-4">
+                    <div class="text-xs font-bold text-slate-400 uppercase mb-3 text-center">Navigasi Soal</div>
+                    <div id="nav-grid" class="grid grid-cols-5 gap-2"></div>
+                    <button onclick="app.finishQuiz()" id="btn-submit-exam" class="mt-6 w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg shadow transition">Selesai Ujian</button>
+                </div>
             </div>
         </div>
 
-        <!-- 4. RESULT -->
-        <div id="result-screen" class="hidden w-full max-w-4xl glass-panel rounded-2xl shadow-xl p-8 fade-in text-center">
-            <h2 class="text-3xl font-bold text-slate-800 mb-2">Ujian Selesai!</h2>
-            <div class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-2xl p-8 mb-8 shadow-lg max-w-md mx-auto">
-                <div class="text-sm font-bold opacity-70 uppercase tracking-widest">Skor Akhir</div>
-                <div id="final-score" class="text-7xl font-black my-2">0</div>
-                <div class="text-lg">Benar <span id="correct-count">0</span> dari 30 Soal</div>
+        <!-- 4. RESULT & LEADERBOARD SCREEN -->
+        <div id="result-screen" class="hidden w-full max-w-4xl glass-panel rounded-2xl shadow-xl border border-white p-6 md:p-8 fade-in text-center">
+            <div class="inline-block p-4 rounded-full bg-green-100 text-green-600 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+             </div>
+            <h2 class="text-3xl font-bold text-slate-800">Ujian Selesai!</h2>
+            <p class="text-slate-500 mb-8">Nilai Anda telah disimpan ke server.</p>
+
+            <div class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl p-6 mb-8 max-w-md mx-auto shadow-lg transform hover:scale-105 transition duration-300">
+                <div class="text-sm font-semibold opacity-80 uppercase tracking-widest">Skor Perolehan</div>
+                <div id="final-score" class="text-6xl font-extrabold my-2">0</div>
+                <div class="text-sm opacity-90">Benar: <span id="correct-count">0</span> dari 30 Soal</div>
             </div>
-            
-            <div class="text-left mb-8">
-                <h3 class="font-bold text-xl mb-4 flex items-center gap-2">Peringkat Peserta (Live)</h3>
-                <div class="bg-white rounded-xl border overflow-hidden">
-                    <table class="w-full text-sm text-left">
-                        <thead class="bg-slate-50 font-bold">
-                            <tr><th class="px-4 py-3">#</th><th class="px-4 py-3">Nama Peserta</th><th class="px-4 py-3 text-right">Skor</th></tr>
-                        </thead>
-                        <tbody id="leaderboard-body" class="divide-y">
-                            <tr><td colspan="3" class="p-4 text-center">Memuat data...</td></tr>
-                        </tbody>
-                    </table>
+
+            <div class="mt-8 text-left">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-xl text-slate-700 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                        Peringkat Peserta (Live)
+                    </h3>
+                    <div id="loading-leaderboard" class="loader hidden"></div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-slate-50 text-slate-500 uppercase font-bold">
+                                <tr>
+                                    <th class="px-6 py-3">#</th>
+                                    <th class="px-6 py-3">Nama Peserta</th>
+                                    <th class="px-6 py-3">Kode</th>
+                                    <th class="px-6 py-3 text-right">Skor</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaderboard-body" class="divide-y divide-slate-100">
+                                <tr><td colspan="4" class="px-6 py-4 text-center text-slate-400 italic">Memuat data...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
-            <div class="mt-8 pt-6 border-t text-slate-500 text-xs text-center space-y-1">
-                <p class="font-bold text-slate-700">Informasi Pengembang:</p>
-                <p class="text-blue-600 font-bold text-sm">Yoyon Sugiyono, S.Pd., M.Pd., Gr.</p>
-                <p>GPD Komunitas Belajar.id Kab. Sampang &bull; UPTD SDN Margantoko 2</p>
-                <p>Kontak: 082331769605</p>
-            </div>
-
-            <div class="mt-8 flex gap-4 no-print justify-center">
-                <button onclick="window.print()" class="bg-slate-200 px-6 py-2 rounded-lg font-bold">Cetak Hasil</button>
-                <button onclick="location.reload()" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold">Keluar</button>
+            <div class="mt-8 flex gap-4 justify-center">
+                 <button onclick="window.print()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-2 px-6 rounded-lg transition">Cetak Hasil</button>
+                <button onclick="location.reload()" class="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-6 rounded-lg transition">Keluar / Login Ulang</button>
             </div>
         </div>
+
     </main>
 
-    <div id="custom-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
-            <h3 class="text-lg font-bold mb-2">Pemberitahuan</h3>
-            <p id="modal-message" class="text-slate-600 mb-6"></p>
-            <div id="modal-actions" class="flex justify-end gap-2"></div>
+    <!-- Custom Modal -->
+    <div id="custom-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 transform scale-100 transition-transform">
+            <h3 class="text-lg font-bold text-slate-800 mb-2">Pemberitahuan</h3>
+            <p id="modal-message" class="text-slate-600 mb-6 text-sm">Pesan...</p>
+            <div class="flex justify-end gap-3" id="modal-actions"></div>
         </div>
     </div>
 
-    <footer class="bg-white border-t border-slate-200 py-8 px-4 mt-auto">
-        <div class="max-w-4xl mx-auto text-center space-y-2">
-            <p class="text-slate-700 font-bold">CAT TKA Matematika SD Online &copy; 2026</p>
-            <p class="text-xs text-slate-500">
-                Pengembang: <span class="font-bold text-slate-800">Yoyon Sugiyono, S.Pd., M.Pd., Gr.</span><br>
-                GPD Komunitas Belajar.id Kab. Sampang &bull; Guru Kelas di UPTD SDN Margantoko 2<br>
-                Kontak: 082331769605
-            </p>
-        </div>
-    </footer>
+    <footer class="text-center py-6 text-slate-400 text-xs">&copy; 2024 Simulasi TKA Matematika SD Online.</footer>
 
-    <!-- Firebase SDK (ES Modules) -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        window.firebaseAPI = { initializeApp, getAuth, signInAnonymously, getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp };
-        document.dispatchEvent(new Event('firebase-ready'));
-    </script>
-
+    <!-- APP LOGIC -->
     <script>
-        // MASUKKAN CONFIG FIREBASE ANDA DI SINI
-        const USER_FIREBASE_CONFIG = {
-            apiKey: "AIzaSyBrW9-IE0yZc-aCp3IjwbCViaILGQbHUj8",
-            authDomain: "tka-math-sd.firebaseapp.com",
-            projectId: "tka-math-sd",
-            storageBucket: "tka-math-sd.firebasestorage.app",
-            messagingSenderId: "33767745712",
-            appId: "1:33767745712:web:4a43a1144ad2203b78b375"
-        };
+        // --- 0. KONFIGURASI FIREBASE (WAJIB DIISI UNTUK GITHUB PAGES) ---
+        // Ganti nilai di bawah ini dengan konfigurasi dari Firebase Console Project Anda
+        // Jika dibiarkan kosong, aplikasi akan berjalan dalam "Mode Offline" di GitHub.
+        const firebaseConfig = {
+  apiKey: "AIzaSyBrW9-IE0yZc-aCp3IjwbCViaILGQbHUj8",
+  authDomain: "tka-math-sd.firebaseapp.com",
+  projectId: "tka-math-sd",
+  storageBucket: "tka-math-sd.firebasestorage.app",
+  messagingSenderId: "33767745712",
+  appId: "1:33767745712:web:4a43a1144ad2203b78b375"
+};
 
+        // --- 1. FIREBASE SETUP & AUTH ---
         let db, auth;
-        const COLLECTION_NAME = "scores";
+        let appId = 'tka-online-app-v1'; // ID Aplikasi statis
+        const COLLECTION_NAME = 'tka_scores';
 
+        async function initFirebase() {
+            const statusDot = document.getElementById('status-dot');
+            const statusText = document.getElementById('status-text');
+
+            // Tunggu modul dimuat
+            if (!window.firebaseModules) {
+                await new Promise(resolve => window.addEventListener('firebaseModulesLoaded', resolve, { once: true }));
+            }
+
+            try {
+                const { initializeApp, getAuth, signInAnonymously, getFirestore, collection, addDoc, serverTimestamp } = window.firebaseModules;
+                
+                let firebaseConfig = null;
+
+                // Prioritas 1: Lingkungan Canvas (Preview)
+                if (typeof window.__firebase_config !== 'undefined' && window.__firebase_config) {
+                    firebaseConfig = JSON.parse(window.__firebase_config);
+                    appId = typeof window.__app_id !== 'undefined' ? window.__app_id : appId;
+                } 
+                // Prioritas 2: Konfigurasi Manual User (GitHub Pages)
+                else if (YOUR_FIREBASE_CONFIG.apiKey) {
+                    firebaseConfig = YOUR_FIREBASE_CONFIG;
+                }
+
+                if (!firebaseConfig) {
+                    throw new Error("Konfigurasi Firebase tidak ditemukan. Silakan isi variable YOUR_FIREBASE_CONFIG di dalam script.");
+                }
+                
+                const firebaseApp = initializeApp(firebaseConfig);
+                auth = getAuth(firebaseApp);
+                db = getFirestore(firebaseApp);
+
+                // Autentikasi Anonim (Guest)
+                await signInAnonymously(auth);
+                
+                console.log("Firebase Connected. User ID:", auth.currentUser?.uid);
+                statusDot.className = "w-2 h-2 rounded-full bg-green-500";
+                statusText.innerText = "Online";
+                statusText.className = "text-xs font-bold text-green-500";
+
+                if (typeof app !== 'undefined' && app.initCredentials) {
+                    app.initCredentials();
+                }
+                
+            } catch (e) {
+                console.warn("Masuk Mode Offline:", e.message);
+                app.isOffline = true;
+                
+                statusDot.className = "w-2 h-2 rounded-full bg-orange-500";
+                statusText.innerText = "Mode Offline";
+                statusText.className = "text-xs font-bold text-orange-500";
+                
+                if (typeof app !== 'undefined' && app.initCredentials) {
+                    app.initCredentials();
+                }
+            }
+        }
+
+        // --- 2. GENERATORS (MATH LOGIC) ---
         const Utils = {
             randInt: (min, max) => Math.floor(Math.random() * (max - min + 1)) + min,
             randChoice: (arr) => arr[Math.floor(Math.random() * arr.length)],
-            shuffle: (arr) => [...arr].sort(() => Math.random() - 0.5),
+            shuffle: (array) => array.sort(() => Math.random() - 0.5),
             gcd: (a, b) => b === 0 ? a : Utils.gcd(b, a % b),
             simplifyFraction: (n, d) => { const div = Utils.gcd(n, d); return [n/div, d/div]; },
             formatFraction: (n, d) => n===d ? "1" : (d===1 ? n : (n>d && n%d!==0 ? `${Math.floor(n/d)} <div class="fraction"><span class="numerator">${n%d}</span><span class="denominator">${d}</span></div>` : `<div class="fraction"><span class="numerator">${n}</span><span class="denominator">${d}</span></div>`))
         };
 
         const Generators = {
-            fraction: () => {
-                const d1 = Utils.randChoice([2, 3, 4, 5, 8]);
-                const d2 = Utils.randChoice([2, 3, 4, 5, 8]);
+            fractionOps: () => {
+                const levels = ['LOTS', 'MOTS', 'HOTS'];
+                const level = Utils.randChoice(levels);
+                let qStr = "", story = "", question = "", correctStr = "";
+                let opts = new Set();
+                const d1 = Utils.randChoice([2, 3, 4, 5, 6]);
+                const d2 = Utils.randChoice([2, 3, 4, 5, 6]);
                 const n1 = Utils.randInt(1, d1-1);
                 const n2 = Utils.randInt(1, d2-1);
-                const isAdd = Math.random() > 0.5;
-                let resN = isAdd ? (n1*d2 + n2*d1) : (n1*d2 - n2*d1);
-                let resD = d1*d2;
-                if(resN <= 0) resN = (n1*d2 + n2*d1); 
-                const [sN, sD] = Utils.simplifyFraction(resN, resD);
-                const ans = Utils.formatFraction(sN, sD);
-                let opts = new Set([ans]);
-                while(opts.size < 4) opts.add(Utils.formatFraction(Utils.randInt(1, 10), Utils.randChoice([2,3,4,5,8])));
-                return { cat: "Bilangan", q: `Hasil dari ${Utils.formatFraction(n1,d1)} ${isAdd?'+':'-'} ${Utils.formatFraction(n2,d2)} adalah...`, ans: ans, opts: Utils.shuffle(Array.from(opts)) };
+
+                if (level === 'LOTS') {
+                    const isAdd = Math.random() > 0.5;
+                    let resN = isAdd ? n1*d2 + n2*d1 : n1*d2 - n2*d1, resD = d1*d2;
+                    let opStr = isAdd ? '+' : '-';
+                    if (!isAdd && resN < 0) { resN = n2*d1 - n1*d2; opStr = '-'; qStr = `${Utils.formatFraction(n2,d2)} ${opStr} ${Utils.formatFraction(n1,d1)}`; }
+                    else { qStr = `${Utils.formatFraction(n1,d1)} ${opStr} ${Utils.formatFraction(n2,d2)}`; }
+                    const [sN, sD] = Utils.simplifyFraction(resN, resD);
+                    correctStr = Utils.formatFraction(sN, sD);
+                    question = `Hasil dari ${qStr} adalah...`;
+                    story = "Hitunglah operasi pecahan berikut.";
+                } else if (level === 'MOTS') {
+                    const isAdd = Math.random() > 0.5;
+                    let resN, resD = d1*d2;
+                    const contexts = [{ obj: "gula pasir", unit: "kg", add: "membeli lagi", sub: "digunakan" }, { obj: "pita", unit: "m", add: "menyambung", sub: "dipotong" }];
+                    const ctx = Utils.randChoice(contexts);
+                    if (isAdd) {
+                        resN = n1*d2 + n2*d1;
+                        story = `Ibu memiliki ${ctx.obj} sebanyak ${Utils.formatFraction(n1,d1)} ${ctx.unit}. Kemudian Ibu ${ctx.add} sebanyak ${Utils.formatFraction(n2,d2)} ${ctx.unit}.`;
+                        question = `Berapa total ${ctx.obj} Ibu sekarang?`;
+                    } else {
+                        let v1 = n1/d1, v2 = n2/d2;
+                        let bigN=n1, bigD=d1, smN=n2, smD=d2;
+                        if(v2 > v1) { bigN=n2; bigD=d2; smN=n1; smD=d1; }
+                        resN = bigN*smD - smN*bigD; resD = bigD*smD;
+                        story = `Awalnya ada ${ctx.obj} sebanyak ${Utils.formatFraction(bigN,bigD)} ${ctx.unit}. Lalu ${ctx.sub} sebanyak ${Utils.formatFraction(smN,smD)} ${ctx.unit}.`;
+                        question = `Berapa sisa ${ctx.obj} sekarang?`;
+                    }
+                    const [sN, sD] = Utils.simplifyFraction(resN, resD);
+                    correctStr = Utils.formatFraction(sN, sD) + ` ${ctx.unit}`;
+                } else {
+                    let v1 = n1/d1, v2 = n2/d2;
+                    let diffN, diffD = d1*d2;
+                    let name1 = "Andi", name2 = "Budi";
+                    if(v1 > v2) { diffN = n1*d2 - n2*d1; } else { diffN = n2*d1 - n1*d2; }
+                    const [sN, sD] = Utils.simplifyFraction(diffN, diffD);
+                    story = `${name1} memiliki tali sepanjang ${Utils.formatFraction(n1,d1)} meter, sedangkan ${name2} memiliki tali ${Utils.formatFraction(n2,d2)} meter.`;
+                    question = `Siapa yang memiliki tali lebih panjang dan berapa selisihnya?`;
+                    let winner = v1 > v2 ? name1 : name2;
+                    correctStr = `${winner}, ${Utils.formatFraction(sN, sD)} m`;
+                    opts.add(`${winner === name1 ? name2 : name1}, ${Utils.formatFraction(sN, sD)} m`);
+                    opts.add(`${winner}, ${Utils.formatFraction(sN+1, sD)} m`);
+                }
+                opts.add(correctStr);
+                let safety = 0;
+                while(opts.size < 4 && safety < 20) {
+                    safety++;
+                    let fakeVal;
+                    if(level === 'HOTS' && question.includes("Siapa")) {
+                         const names = ["Andi", "Budi"];
+                         const n = Utils.randChoice(names);
+                         const v = Utils.formatFraction(Utils.randInt(1, 5), Utils.randChoice([2,3,4,5,6])) + " m";
+                         fakeVal = `${n}, ${v}`;
+                    } else {
+                        const fN = Utils.randInt(1, 10);
+                        const fD = Utils.randChoice([d1, d2, d1*d2]);
+                        const [sfN, sfD] = Utils.simplifyFraction(fN, fD);
+                        fakeVal = Utils.formatFraction(sfN, sfD) + (level !== 'LOTS' ? (level==='MOTS'?` ${story.includes('kg')?'kg':'m'}`:'') : '');
+                    }
+                    opts.add(fakeVal);
+                }
+                return { cat: "Bilangan", level: level, q: `<div class="mb-4 text-base font-normal text-slate-600 bg-slate-50 p-4 rounded-lg border-l-4 border-blue-400 italic">"${story}"</div><div class="font-bold text-lg text-slate-800">${question}</div>`, ans: correctStr, opts: Array.from(opts) };
             },
             geometry: () => {
-                const p = Utils.randInt(5, 15), l = Utils.randInt(2, 8);
-                const isArea = Math.random() > 0.5;
-                const ans = isArea ? `${p*l} cm²` : `${2*(p+l)} cm`;
-                let opts = new Set([ans]);
-                while(opts.size < 4) opts.add(`${Utils.randInt(10, 50)} cm${isArea?'²':''}`);
-                return { cat: "Geometri", q: `Persegi panjang dengan panjang ${p} cm dan lebar ${l} cm. Berapakah ${isArea?'luas':'keliling'}nya?`, ans: ans, opts: Utils.shuffle(Array.from(opts)) };
+                const levels = ['LOTS', 'MOTS', 'HOTS'];
+                const level = Utils.randChoice(levels);
+                const p = Utils.randInt(6, 12);
+                const l = Utils.randInt(3, 8);
+                let correctStr = "", story = "", question = "", vis = "";
+                let opts = new Set();
+                if (level === 'LOTS') {
+                    const isArea = Math.random() > 0.5;
+                    const ans = isArea ? p*l : 2*(p+l);
+                    story = `Sebuah persegi panjang memiliki panjang ${p} cm dan lebar ${l} cm.`;
+                    question = `Hitunglah ${isArea ? 'luas' : 'keliling'} bangun tersebut!`;
+                    correctStr = ans + (isArea ? " cm²" : " cm");
+                    vis = `<div style="width:${p*10}px;height:${l*10}px;border:2px solid #3b82f6;background:#dbeafe;display:flex;align-items:center;justify-content:center;font-size:10px;">${p}x${l}</div>`;
+                } else if (level === 'MOTS') {
+                    const isArea = Math.random() > 0.5;
+                    const ans = isArea ? p*l : 2*(p+l);
+                    const ctx = isArea ? { t: "kertas karton", a: "luas kertas", u: "cm²" } : { t: "bingkai foto", a: "panjang kayu bingkai", u: "cm" };
+                    story = `Budi ingin membuat ${ctx.t} dengan ukuran panjang ${p} cm dan lebar ${l} cm.`;
+                    question = `Berapakah ${ctx.a} yang dibutuhkan?`;
+                    correctStr = ans + " " + ctx.u;
+                } else {
+                    const area = p * l;
+                    story = `Sebuah kebun berbentuk persegi panjang memiliki Luas ${area} m². Jika panjangnya ${p} m.`;
+                    question = `Berapakah lebar kebun tersebut?`;
+                    correctStr = `${l} m`;
+                    opts.add(`${l+2} m`); opts.add(`${p} m`); opts.add(`${Math.floor(area/2)} m`);
+                }
+                opts.add(correctStr);
+                while(opts.size < 4) {
+                    const val = Utils.randInt(10, 100);
+                    const unit = correctStr.includes('²') ? "cm²" : (correctStr.includes('m') ? "m" : "cm");
+                    opts.add(val + " " + unit);
+                }
+                return { cat: "Geometri", level: level, q: `<div class="mb-4 text-base font-normal text-slate-600 bg-green-50 p-4 rounded-lg border-l-4 border-green-400 italic">"${story}"</div><div class="font-bold text-lg text-slate-800">${question}</div>`, ans: correctStr, opts: Array.from(opts), vis: vis };
+            },
+            data: () => {
+                const levels = ['LOTS', 'MOTS', 'HOTS'];
+                const level = Utils.randChoice(levels);
+                const data = [Utils.randInt(20,50), Utils.randInt(20,50), Utils.randInt(20,50), Utils.randInt(20,50)];
+                const labels = ["Jan", "Feb", "Mar", "Apr"];
+                const max = Math.max(...data);
+                const min = Math.min(...data);
+                let question = "", ans = "";
+                let opts = new Set();
+                if (level === 'LOTS') {
+                    question = "Bulan apa yang memiliki nilai tertinggi?";
+                    ans = labels[data.indexOf(max)];
+                    labels.forEach(l => opts.add(l));
+                } else if (level === 'MOTS') {
+                    question = "Berapa jumlah total data pada bulan Januari dan Maret?";
+                    ans = (data[0] + data[2]).toString();
+                } else {
+                    if(Math.random() > 0.5) {
+                        question = "Berapa selisih antara nilai tertinggi dan terendah?";
+                        ans = (max - min).toString();
+                    } else {
+                        question = "Jika rata-rata target adalah 40, bulan apa saja yang di atas target?";
+                        const passed = labels.filter((_,i) => data[i] > 40);
+                        ans = passed.length > 0 ? passed.join(", ") : "Tidak ada";
+                        if(ans === "Tidak ada") { opts.add("Jan, Feb"); opts.add("Semua Bulan"); opts.add("Mar"); } 
+                        else { opts.add(passed[0] || "Jan"); }
+                    }
+                }
+                if(level !== 'LOTS') {
+                    opts.add(ans);
+                    while(opts.size < 4) { opts.add((parseInt(ans) || 0) + Utils.randChoice([-5, 5, 10, -10, 20])); }
+                }
+                let html = `<div class="w-full flex flex-col items-center"><div class="flex items-end gap-4 h-40 border-b-2 border-slate-300 pb-1 px-4 w-full max-w-md mx-auto">`; 
+                data.forEach((v, i) => {
+                    const heightPercent = (v/Math.max(...data, 60))*100;
+                    html += `<div class="flex-1 flex flex-col justify-end group relative h-full"><div class="w-full bg-indigo-500 rounded-t" style="height:${heightPercent}%"><span class="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs font-bold text-indigo-700">${v}</span></div></div>`;
+                });
+                html += `</div><div class="flex text-xs mt-2 gap-4 text-slate-600 font-bold w-full max-w-md mx-auto">${labels.map(l=>`<div class="flex-1 text-center">${l}</div>`).join('')}</div></div>`;
+                return { cat: "Data", level: level, q: `<div class="mb-4 text-base font-normal text-slate-600 bg-white p-2 rounded-lg border border-slate-200">Data Penjualan Bulanan:</div>${html}<div class="mt-6 font-bold text-lg text-slate-800 border-t pt-4">${question}</div>`, ans: ans, opts: Array.from(opts), vis: null };
             }
         };
 
+        // --- 3. APP STATE & LOGIC ---
         const app = {
-            user: { name: '', code: '', token: '' },
-            questions: [], answers: [], currIdx: 0, timer: null, time: 3600, isOffline: false,
+            user: { code: '', name: '', gender: '', dob: '', token: '' },
+            questions: [],
+            answers: [],
+            currIdx: 0,
+            timer: null,
+            time: 3600,
+            isOffline: false,
+            generatedCreds: { code: '', pass: '' },
 
-            init: async () => {
-                const dot = document.getElementById('status-dot');
-                const txt = document.getElementById('status-text');
-                try {
-                    const fb = window.firebaseAPI;
-                    const firebaseApp = fb.initializeApp(USER_FIREBASE_CONFIG);
-                    auth = fb.getAuth(firebaseApp);
-                    db = fb.getFirestore(firebaseApp);
-                    await fb.signInAnonymously(auth);
-                    dot.className = "w-2 h-2 rounded-full bg-green-500";
-                    txt.innerText = "Online";
-                } catch (e) {
-                    console.warn("Offline mode active");
-                    app.isOffline = true;
-                    txt.innerText = "Offline Mode";
+            showModal: (msg, type = 'alert', callback = null) => {
+                const modal = document.getElementById('custom-modal');
+                const msgEl = document.getElementById('modal-message');
+                const actionsEl = document.getElementById('modal-actions');
+                msgEl.innerHTML = msg;
+                actionsEl.innerHTML = '';
+                if (type === 'confirm') {
+                    const cancelBtn = document.createElement('button');
+                    cancelBtn.className = "px-4 py-2 rounded-lg bg-slate-200 text-slate-700 font-bold hover:bg-slate-300";
+                    cancelBtn.innerText = "Batal";
+                    cancelBtn.onclick = () => modal.classList.add('hidden');
+                    const okBtn = document.createElement('button');
+                    okBtn.className = "px-4 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700";
+                    okBtn.innerText = "Ya, Yakin";
+                    okBtn.onclick = () => { modal.classList.add('hidden'); if (callback) callback(); };
+                    actionsEl.appendChild(cancelBtn);
+                    actionsEl.appendChild(okBtn);
+                } else {
+                    const okBtn = document.createElement('button');
+                    okBtn.className = "px-4 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700";
+                    okBtn.innerText = "OK";
+                    okBtn.onclick = () => { modal.classList.add('hidden'); if (callback) callback(); };
+                    actionsEl.appendChild(okBtn);
                 }
-                app.initCredentials();
+                modal.classList.remove('hidden');
             },
 
             initCredentials: () => {
-                const codes = ['TKA-101', 'TKA-102', 'TKA-201', 'TKA-202'];
-                app.user.code = Utils.randChoice(codes);
-                app.user.pass = Math.random().toString(36).slice(-4).toUpperCase();
-                document.getElementById('gen-code').innerText = app.user.code;
-                document.getElementById('gen-pass').innerText = app.user.pass;
+                const codes = ['TKA-001', 'TKA-042', 'SISWA-88', 'PESERTA-12', 'BINTANG-07'];
+                app.generatedCreds.code = `${codes[Math.floor(Math.random() * codes.length)]}`;
+                app.generatedCreds.pass = Math.random().toString(36).slice(-6).toUpperCase();
+                const codeElem = document.getElementById('gen-code');
+                const passElem = document.getElementById('gen-pass');
+                if (codeElem) codeElem.innerText = app.generatedCreds.code;
+                if (passElem) passElem.innerText = app.generatedCreds.pass;
             },
 
             handleLogin: () => {
-                app.user.token = Math.random().toString(36).substring(2, 6).toUpperCase();
+                app.user.code = app.generatedCreds.code;
+                app.user.token = Math.random().toString(36).substring(2, 7).toUpperCase();
                 document.getElementById('input-conf-code').value = app.user.code;
                 document.getElementById('token-display').innerText = app.user.token;
                 document.getElementById('login-screen').classList.add('hidden');
@@ -300,30 +571,47 @@
 
             confirmData: () => {
                 const name = document.getElementById('input-name').value.trim();
+                const gender = document.getElementById('input-gender').value;
                 const dob = document.getElementById('input-dob').value;
-                const token = document.getElementById('input-token').value.trim().toUpperCase();
-                if(!name || !dob || token !== app.user.token) return app.showModal("Lengkapi data dan token dengan benar!");
+                const manualToken = document.getElementById('input-token').value.trim().toUpperCase();
+                if (!name || !gender || !dob) {
+                    app.showModal("Mohon lengkapi Nama, Jenis Kelamin, dan Tanggal Lahir!", 'alert');
+                    return;
+                }
+                if (manualToken !== app.user.token) {
+                    app.showModal("Token Ujian tidak sesuai! Mohon periksa kembali token yang tertera.", 'alert');
+                    return;
+                }
                 app.user.name = name;
-                document.getElementById('display-name').innerText = name;
-                document.getElementById('display-code').innerText = app.user.code;
+                app.user.gender = gender;
+                app.user.dob = dob;
                 document.getElementById('confirmation-screen').classList.add('hidden');
                 document.getElementById('quiz-screen').classList.remove('hidden');
                 document.getElementById('user-info-display').classList.remove('hidden');
+                document.getElementById('display-name').innerText = app.user.name;
+                document.getElementById('display-code').innerText = app.user.code;
                 document.getElementById('timer-display').classList.remove('hidden');
                 app.startQuiz();
             },
 
-            startQuiz: () => {
+            generateQuestions: () => {
                 app.questions = [];
-                for(let i=0; i<15; i++) app.questions.push(Generators.fraction());
-                for(let i=0; i<15; i++) app.questions.push(Generators.geometry());
+                for(let i=0; i<12; i++) app.questions.push(Generators.fractionOps());
+                for(let i=0; i<12; i++) app.questions.push(Generators.geometry());
+                for(let i=0; i<6; i++) app.questions.push(Generators.data());
                 app.questions = Utils.shuffle(app.questions);
+                app.questions.forEach(q => q.opts = Utils.shuffle(q.opts)); 
                 app.answers = new Array(30).fill(null);
+            },
+
+            startQuiz: () => {
+                app.generateQuestions();
                 app.renderNav();
                 app.loadQ(0);
                 app.timer = setInterval(() => {
                     app.time--;
-                    const m = Math.floor(app.time/60), s = app.time%60;
+                    const m = Math.floor(app.time/60);
+                    const s = app.time%60;
                     document.getElementById('timer-display').innerText = `${m}:${s<10?'0'+s:s}`;
                     if(app.time <= 0) app.finishQuiz();
                 }, 1000);
@@ -333,102 +621,149 @@
                 app.currIdx = idx;
                 const q = app.questions[idx];
                 document.getElementById('question-progress').innerText = `Soal ${idx+1}/30`;
+                document.getElementById('category-badge').innerText = q.cat;
+                const lvlBadge = document.getElementById('level-badge');
+                lvlBadge.innerText = q.level;
+                if(q.level === 'LOTS') lvlBadge.className = "bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider border border-green-200";
+                else if(q.level === 'MOTS') lvlBadge.className = "bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider border border-yellow-200";
+                else lvlBadge.className = "bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider border border-red-200";
                 document.getElementById('question-text').innerHTML = q.q;
-                const container = document.getElementById('options-container');
-                container.innerHTML = '';
-                q.opts.forEach(opt => {
+                const vis = document.getElementById('visual-container');
+                if(q.vis) { vis.innerHTML = q.vis; vis.classList.remove('hidden'); } else vis.classList.add('hidden');
+                const opts = document.getElementById('options-container');
+                opts.innerHTML = '';
+                const labels = ['A', 'B', 'C', 'D'];
+                q.opts.forEach((opt, i) => {
                     const btn = document.createElement('button');
-                    const active = app.answers[idx] === opt;
-                    btn.className = `w-full text-left p-4 rounded-xl border-2 transition ${active ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-white'}`;
-                    btn.innerHTML = opt;
+                    const isSel = app.answers[idx] === opt;
+                    const label = labels[i] || '';
+                    btn.className = `w-full text-left p-3 rounded-lg border-2 transition flex items-center gap-3 ${isSel ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-blue-300 bg-white'}`;
+                    btn.innerHTML = `<div class="flex-shrink-0 h-8 w-8 rounded-full ${isSel ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'} flex items-center justify-center font-bold text-sm border ${isSel ? 'border-blue-600' : 'border-slate-300'}">${label}</div><span class="text-slate-700 font-medium">${opt}</span>`;
                     btn.onclick = () => { app.answers[idx] = opt; app.loadQ(idx); app.updateNav(); };
-                    container.appendChild(btn);
+                    opts.appendChild(btn);
                 });
-                document.getElementById('btn-prev').disabled = idx === 0;
+                const prevBtn = document.getElementById('btn-prev');
                 const nextBtn = document.getElementById('btn-next');
-                nextBtn.innerText = idx === 29 ? "Selesai" : "Berikutnya";
-                nextBtn.onclick = idx === 29 ? app.finishQuiz : app.nextQuestion;
+                if(prevBtn) prevBtn.disabled = idx === 0;
+                if(nextBtn) {
+                    nextBtn.onclick = null; 
+                    if(idx === 29) {
+                        nextBtn.innerHTML = `Selesai Ujian <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>`;
+                        nextBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                        nextBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+                        nextBtn.onclick = () => app.finishQuiz(); 
+                    } else {
+                        nextBtn.innerHTML = `Soal Berikutnya <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>`;
+                        nextBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                        nextBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                        nextBtn.onclick = () => app.nextQuestion();
+                    }
+                }
                 app.updateNav();
             },
 
-            nextQuestion: () => app.loadQ(app.currIdx + 1),
-            prevQuestion: () => app.loadQ(app.currIdx - 1),
+            prevQuestion: () => { if(app.currIdx > 0) app.loadQ(app.currIdx - 1); },
+            nextQuestion: () => { if(app.currIdx < 29) app.loadQ(app.currIdx + 1); },
 
             renderNav: () => {
                 const grid = document.getElementById('nav-grid');
                 grid.innerHTML = '';
                 for(let i=0; i<30; i++) {
-                    const b = document.createElement('button');
-                    b.id = `nav-${i}`;
-                    b.innerText = i+1;
-                    b.className = "h-10 w-10 rounded-lg font-bold text-xs border";
-                    b.onclick = () => app.loadQ(i);
-                    grid.appendChild(b);
+                    const btn = document.createElement('button');
+                    btn.id = `nav-${i}`;
+                    btn.innerText = i+1;
+                    btn.className = `h-8 w-8 rounded text-xs font-bold bg-slate-200 text-slate-600`;
+                    btn.onclick = () => app.loadQ(i);
+                    grid.appendChild(btn);
                 }
             },
 
             updateNav: () => {
                 for(let i=0; i<30; i++) {
-                    const b = document.getElementById(`nav-${i}`);
-                    if(b) b.className = `h-10 w-10 rounded-lg font-bold text-xs transition ${i === app.currIdx ? 'ring-2 ring-blue-600 bg-white' : (app.answers[i] ? 'bg-blue-600 text-white' : 'bg-slate-200')}`;
+                    const btn = document.getElementById(`nav-${i}`);
+                    btn.className = `h-8 w-8 rounded text-xs font-bold transition ${i === app.currIdx ? 'ring-2 ring-blue-500 bg-white' : (app.answers[i] ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600')}`;
                 }
             },
 
             finishQuiz: () => {
-                app.showModal("Kirim jawaban sekarang?", "confirm", async () => {
+                app.showModal("Apakah Anda yakin ingin menyelesaikan ujian ini? Jawaban tidak dapat diubah setelah ini.", 'confirm', async () => {
                     clearInterval(app.timer);
                     let correct = 0;
                     app.questions.forEach((q, i) => { if(app.answers[i] === q.ans) correct++; });
-                    const score = Math.round((correct/30)*100);
+                    const score = Math.round((correct/30) * 100);
                     document.getElementById('quiz-screen').classList.add('hidden');
+                    document.getElementById('timer-display').classList.add('hidden');
                     document.getElementById('result-screen').classList.remove('hidden');
                     document.getElementById('final-score').innerText = score;
                     document.getElementById('correct-count').innerText = correct;
-                    if(!app.isOffline) {
-                        try {
-                            const fb = window.firebaseAPI;
-                            await fb.addDoc(fb.collection(db, COLLECTION_NAME), { name: app.user.name, score: score, timestamp: fb.serverTimestamp() });
-                            app.loadLeaderboard();
-                        } catch(e) { console.error(e); }
+                    
+                    if (!app.isOffline && db && auth.currentUser) {
+                        await app.saveScore(score);
+                        app.loadLeaderboard();
+                    } else {
+                        document.getElementById('leaderboard-body').innerHTML = '<tr><td colspan="4" class="p-4 text-center text-orange-500">Mode Offline: Data tidak disimpan ke server.</td></tr>';
                     }
                 });
             },
 
-            loadLeaderboard: () => {
-                const fb = window.firebaseAPI;
-                const q = fb.query(fb.collection(db, COLLECTION_NAME), fb.orderBy("score", "desc"), fb.limit(10));
-                fb.onSnapshot(q, (snap) => {
-                    const body = document.getElementById('leaderboard-body');
-                    body.innerHTML = '';
-                    let r = 1;
-                    snap.forEach(doc => {
-                        const d = doc.data();
-                        body.innerHTML += `<tr><td class="px-4 py-3">${r++}</td><td class="px-4 py-3 font-bold">${d.name}</td><td class="px-4 py-3 text-right text-blue-600 font-black">${d.score}</td></tr>`;
+            saveScore: async (score) => {
+                if(!db || !auth.currentUser) return;
+                try {
+                    const { collection, addDoc, serverTimestamp } = window.firebaseModules;
+                    
+                    // Logic untuk path collection:
+                    // Jika di Canvas (ada __app_id), gunakan path panjang. Jika manual, gunakan path pendek.
+                    let collectionRef;
+                    if (typeof window.__app_id !== 'undefined') {
+                         collectionRef = collection(db, 'artifacts', appId, 'public', 'data', COLLECTION_NAME);
+                    } else {
+                         // Path lebih sederhana untuk GitHub/Localhost user
+                         collectionRef = collection(db, COLLECTION_NAME);
+                    }
+                    
+                    await addDoc(collectionRef, { 
+                        code: app.user.code, 
+                        name: app.user.name, 
+                        score: score, 
+                        timestamp: serverTimestamp() 
                     });
-                });
+                } catch (e) { console.error("Save Error", e); }
             },
 
-            showModal: (msg, type="alert", cb) => {
-                const m = document.getElementById('custom-modal'), act = document.getElementById('modal-actions');
-                document.getElementById('modal-message').innerText = msg;
-                act.innerHTML = '';
-                const ok = document.createElement('button');
-                ok.className = "bg-blue-600 text-white px-4 py-2 rounded-lg font-bold";
-                ok.innerText = "OK";
-                ok.onclick = () => { m.classList.add('hidden'); if(cb) cb(); };
-                if(type === "confirm") {
-                    const can = document.createElement('button');
-                    can.className = "bg-slate-200 px-4 py-2 rounded-lg font-bold";
-                    can.innerText = "Batal";
-                    can.onclick = () => m.classList.add('hidden');
-                    act.appendChild(can);
+            loadLeaderboard: () => {
+                if(!db) return;
+                const { collection, query, orderBy, limit, onSnapshot } = window.firebaseModules;
+                
+                let collectionRef;
+                if (typeof window.__app_id !== 'undefined') {
+                     collectionRef = collection(db, 'artifacts', appId, 'public', 'data', COLLECTION_NAME);
+                } else {
+                     collectionRef = collection(db, COLLECTION_NAME);
                 }
-                act.appendChild(ok);
-                m.classList.remove('hidden');
+
+                const q = query(collectionRef, orderBy("score", "desc"), limit(20));
+                document.getElementById('loading-leaderboard').classList.remove('hidden');
+                onSnapshot(q, (snapshot) => {
+                    const tbody = document.getElementById('leaderboard-body');
+                    tbody.innerHTML = '';
+                    let rank = 1;
+                    if(snapshot.empty) { tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center">Belum ada data.</td></tr>`; }
+                    snapshot.forEach((doc) => {
+                        const d = doc.data();
+                        const isMe = d.name === app.user.name && d.code === app.user.code;
+                        const row = `<tr class="${isMe ? 'bg-yellow-50 border-l-4 border-yellow-400' : 'hover:bg-slate-50'} transition"><td class="px-6 py-4 font-bold text-slate-500">${rank++}</td><td class="px-6 py-4 font-semibold ${isMe ? 'text-blue-700' : 'text-slate-700'}">${d.name} ${isMe ? '(Anda)' : ''}</td><td class="px-6 py-4 text-slate-500 text-xs">${d.code}</td><td class="px-6 py-4 text-right font-bold text-blue-600">${d.score}</td></tr>`;
+                        tbody.innerHTML += row;
+                    });
+                    document.getElementById('loading-leaderboard').classList.add('hidden');
+                }, (error) => {
+                    console.error("Leaderboard Error:", error);
+                    document.getElementById('leaderboard-body').innerHTML = `<tr><td colspan="4" class="text-center text-red-500 text-xs">Gagal memuat data (Izin ditolak atau Offline).<br>Cek Console Log.</td></tr>`;
+                });
             }
         };
 
-        document.addEventListener('firebase-ready', app.init);
+        window.app = app;
+        window.addEventListener('load', initFirebase);
     </script>
 </body>
 </html>
