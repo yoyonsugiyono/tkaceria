@@ -232,6 +232,33 @@
                 <div class="text-sm opacity-90">Benar: <span id="correct-count">0</span> dari 30 Soal</div>
             </div>
 
+            <div id="leaderboard-section" class="mt-8 text-left">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-xl text-slate-700 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                        Peringkat Peserta (Live)
+                    </h3>
+                    <div id="loading-leaderboard" class="loader hidden"></div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-slate-50 text-slate-500 uppercase font-bold">
+                                <tr>
+                                    <th class="px-6 py-3">#</th>
+                                    <th class="px-6 py-3">Nama Peserta</th>
+                                    <th class="px-6 py-3">Kode</th>
+                                    <th class="px-6 py-3 text-right">Skor</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaderboard-body" class="divide-y divide-slate-100">
+                                <tr><td colspan="4" class="px-6 py-4 text-center text-slate-400 italic">Memuat data...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- Tombol Aksi -->
             <div class="mt-8 flex gap-4 justify-center print:hidden">
                  <button onclick="document.getElementById('discussion-section').classList.toggle('hidden');" class="bg-blue-100 border border-blue-300 hover:bg-blue-200 text-blue-700 font-bold py-2 px-6 rounded-lg transition">Lihat Pembahasan</button>
@@ -242,7 +269,9 @@
             <!-- Bagian Pembahasan -->
             <div id="discussion-section" class="hidden mt-8 text-left border-t-2 border-slate-200 pt-8">
                 <h3 class="font-bold text-2xl text-slate-800 mb-6 text-center">Pembahasan Soal</h3>
-                <div id="discussion-content" class="space-y-6"></div>
+                <div id="discussion-content" class="space-y-6">
+                    <!-- Konten Pembahasan akan di-inject lewat JS -->
+                </div>
             </div>
         </div>
 
@@ -530,6 +559,29 @@
                 document.getElementById('confirmation-screen').classList.remove('hidden');
             },
 
+            // --- FUNGSI BARU UNTUK MODE AMAN ---
+            enableExamMode: () => {
+                // 1. Fullscreen
+                const docElm = document.documentElement;
+                if (docElm.requestFullscreen) {
+                    docElm.requestFullscreen().catch((err) => {
+                        console.log("Fullscreen ditolak atau tidak didukung:", err);
+                    });
+                }
+
+                // 2. Disable Back Button (Manipulasi History)
+                history.pushState(null, null, location.href);
+                window.onpopstate = function () {
+                    history.pushState(null, null, location.href);
+                    app.showModal("Mode Ujian Aktif: Navigasi Kembali dinonaktifkan.", 'alert');
+                };
+
+                // 3. Prevent Refresh/Close Tab Warning
+                window.onbeforeunload = function() {
+                    return "Ujian sedang berlangsung. Apakah Anda yakin ingin keluar? Data mungkin hilang.";
+                };
+            },
+
             confirmData: () => {
                 const name = document.getElementById('input-name').value.trim();
                 const gender = document.getElementById('input-gender').value;
@@ -546,6 +598,10 @@
                 app.user.name = name;
                 app.user.gender = gender;
                 app.user.dob = dob;
+                
+                // AKTIFKAN MODE AMAN SAAT MULAI
+                app.enableExamMode();
+
                 document.getElementById('confirmation-screen').classList.add('hidden');
                 document.getElementById('quiz-screen').classList.remove('hidden');
                 document.getElementById('user-info-display').classList.remove('hidden');
@@ -652,6 +708,9 @@
             finishQuiz: () => {
                 app.showModal("Apakah Anda yakin ingin menyelesaikan ujian ini? Jawaban tidak dapat diubah setelah ini.", 'confirm', async () => {
                     clearInterval(app.timer);
+                    // Hapus listener 'beforeunload' agar bisa keluar tanpa peringatan
+                    window.onbeforeunload = null; 
+                    
                     let correct = 0;
                     
                     const discussionContent = document.getElementById('discussion-content');
@@ -693,7 +752,7 @@
                         await app.saveScore(score);
                         app.loadLeaderboard();
                     } else {
-                        // Offline mode handling if needed
+                        document.getElementById('leaderboard-body').innerHTML = '<tr><td colspan="4" class="p-4 text-center text-orange-500">Mode Offline: Data tidak disimpan ke server.</td></tr>';
                     }
                 });
             },
@@ -727,15 +786,9 @@
                      collectionRef = collection(db, COLLECTION_NAME);
                 }
                 const q = query(collectionRef, orderBy("score", "desc"), limit(20));
-                
-                // Tambahkan pengecekan elemen
-                const loadingEl = document.getElementById('loading-leaderboard');
-                if (loadingEl) loadingEl.classList.remove('hidden');
-                
+                document.getElementById('loading-leaderboard').classList.remove('hidden');
                 onSnapshot(q, (snapshot) => {
                     const tbody = document.getElementById('leaderboard-body');
-                    if (!tbody) return; // Guard clause
-                    
                     tbody.innerHTML = '';
                     let rank = 1;
                     if(snapshot.empty) { tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center">Belum ada data.</td></tr>`; }
@@ -745,11 +798,10 @@
                         const row = `<tr class="${isMe ? 'bg-yellow-50 border-l-4 border-yellow-400' : 'hover:bg-slate-50'} transition"><td class="px-6 py-4 font-bold text-slate-500">${rank++}</td><td class="px-6 py-4 font-semibold ${isMe ? 'text-blue-700' : 'text-slate-700'}">${d.name} ${isMe ? '(Anda)' : ''}</td><td class="px-6 py-4 text-slate-500 text-xs">${d.code}</td><td class="px-6 py-4 text-right font-bold text-blue-600">${d.score}</td></tr>`;
                         tbody.innerHTML += row;
                     });
-                    if (loadingEl) loadingEl.classList.add('hidden');
+                    document.getElementById('loading-leaderboard').classList.add('hidden');
                 }, (error) => {
                     console.error("Leaderboard Error:", error);
-                    const tbody = document.getElementById('leaderboard-body');
-                    if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="text-center text-red-500 text-xs">Gagal memuat data (Izin ditolak atau Offline).<br>Cek Console Log.</td></tr>`;
+                    document.getElementById('leaderboard-body').innerHTML = `<tr><td colspan="4" class="text-center text-red-500 text-xs">Gagal memuat data (Izin ditolak atau Offline).<br>Cek Console Log.</td></tr>`;
                 });
             }
         };
