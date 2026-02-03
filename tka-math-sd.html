@@ -21,26 +21,30 @@
         body { font-family: 'Nunito', sans-serif; background-color: #f1f5f9; }
         .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
         
-        /* Animations */
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .fade-in { animation: fadeIn 0.5s ease-out forwards; }
         
-        /* Math Fraction Styling */
         .fraction { display: inline-block; text-align: center; vertical-align: middle; margin: 0 0.2em; font-size: 1.1em; font-weight: bold; color: #2563eb; }
         .fraction > span { display: block; padding: 0.1em; }
         .fraction span.numerator { border-bottom: 2px solid currentColor; }
         .fraction span.denominator { border-top: 0px; }
 
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
 
-        /* Loader */
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* PRINT STYLES */
+        /* Styles for Complex Inputs */
+        .checkbox-wrapper input:checked + div { background-color: #eff6ff; border-color: #3b82f6; color: #1d4ed8; }
+        .checkbox-wrapper input:checked + div .check-icon { display: block; }
+        
+        /* Table Styles */
+        .complex-table th, .complex-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        .complex-table th { background-color: #f8fafc; font-weight: 700; color: #475569; }
+        .complex-table tr:hover { background-color: #f1f5f9; }
+
         @media print {
             body { background: white !important; color: black !important; }
             body * { visibility: hidden; }
@@ -114,9 +118,6 @@
             <button onclick="app.handleLogin()" id="btn-login" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg transition transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
                 MASUK
             </button>
-            <div class="text-center mt-4">
-                <p class="text-xs text-slate-400">Kode dan sandi di-generate otomatis oleh aplikasi.</p>
-            </div>
         </div>
 
         <!-- 2. DATA ENTRY & CONFIRMATION SCREEN -->
@@ -191,7 +192,11 @@
                 <div class="flex-grow p-6 md:p-10">
                     <div id="question-text" class="text-lg text-slate-800 mb-6 leading-relaxed"></div>
                     <div id="visual-container" class="mb-6 w-full flex justify-center bg-white rounded-xl p-4 hidden border border-slate-200 shadow-inner"></div>
-                    <div id="options-container" class="grid grid-cols-1 gap-3"></div>
+                    <div id="question-type-hint" class="mb-4 text-sm font-semibold text-blue-600 italic"></div>
+                    
+                    <!-- AREA OPSI JAWABAN DINAMIS -->
+                    <div id="options-container" class="w-full"></div>
+
                     <div class="flex justify-between items-center mt-10 pt-6 border-t border-slate-100">
                         <button onclick="app.prevQuestion()" id="btn-prev" class="flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition disabled:opacity-50 disabled:cursor-not-allowed">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
@@ -259,12 +264,10 @@
                 <button onclick="location.reload()" class="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-6 rounded-lg transition">Keluar / Login Ulang</button>
             </div>
 
-            <!-- Bagian Pembahasan (Hidden by default) -->
+            <!-- Bagian Pembahasan -->
             <div id="discussion-section" class="hidden mt-8 text-left border-t-2 border-slate-200 pt-8">
                 <h3 class="font-bold text-2xl text-slate-800 mb-6 text-center">Pembahasan Soal</h3>
-                <div id="discussion-content" class="space-y-6">
-                    <!-- Konten Pembahasan akan di-inject lewat JS -->
-                </div>
+                <div id="discussion-content" class="space-y-6"></div>
             </div>
         </div>
 
@@ -318,7 +321,7 @@
             }
 
             try {
-                const { initializeApp, getAuth, signInAnonymously, getFirestore } = window.firebaseModules;
+                const { initializeApp, getAuth, signInAnonymously, getFirestore, collection, addDoc, serverTimestamp } = window.firebaseModules;
                 let firebaseConfig = null;
                 if (typeof window.__firebase_config !== 'undefined' && window.__firebase_config) {
                     firebaseConfig = JSON.parse(window.__firebase_config);
@@ -370,76 +373,46 @@
                     const isAdd = Math.random() > 0.5;
                     let resN = isAdd ? n1*d2 + n2*d1 : n1*d2 - n2*d1, resD = d1*d2;
                     let opStr = isAdd ? '+' : '-';
-                    let stepOp = isAdd ? 'Penjumlahan' : 'Pengurangan';
-                    if (!isAdd && resN < 0) { 
-                        resN = n2*d1 - n1*d2; opStr = '-'; 
-                        qStr = `${Utils.formatFraction(n2,d2)} ${opStr} ${Utils.formatFraction(n1,d1)}`; 
-                        explanation = `Samakan penyebut kedua pecahan menjadi KPK dari ${d2} dan ${d1}, yaitu ${d1*d2}.<br>(${n2}×${d1})/(${d2}×${d1}) - (${n1}×${d2})/(${d1}×${d2}) = ${n2*d1}/${d1*d2} - ${n1*d2}/${d1*d2} = ${(n2*d1)-(n1*d2)}/${d1*d2}.`;
-                    }
-                    else { 
-                        qStr = `${Utils.formatFraction(n1,d1)} ${opStr} ${Utils.formatFraction(n2,d2)}`; 
-                        explanation = `Samakan penyebut kedua pecahan menjadi KPK dari ${d1} dan ${d2}, yaitu ${d1*d2}.<br>(${n1}×${d2})/(${d1}×${d2}) ${opStr} (${n2}×${d1})/(${d2}×${d1}) = ${n1*d2}/${d1*d2} ${opStr} ${n2*d1}/${d1*d2} = ${resN}/${d1*d2}.`;
-                    }
+                    if (!isAdd && resN < 0) { resN = n2*d1 - n1*d2; opStr = '-'; qStr = `${Utils.formatFraction(n2,d2)} ${opStr} ${Utils.formatFraction(n1,d1)}`; }
+                    else { qStr = `${Utils.formatFraction(n1,d1)} ${opStr} ${Utils.formatFraction(n2,d2)}`; }
                     const [sN, sD] = Utils.simplifyFraction(resN, resD);
                     correctStr = Utils.formatFraction(sN, sD);
                     question = `Hasil dari ${qStr} adalah...`;
                     story = "Hitunglah operasi pecahan berikut.";
-                    explanation += `<br>Sederhanakan pecahan ${resN}/${d1*d2} menjadi ${correctStr}.`;
+                    explanation = `Samakan penyebut menjadi ${d1*d2}. Hasil: ${correctStr}`;
+                    opts.add(correctStr);
+                    return { type: 'single', cat: "Bilangan", level: level, q: `<div class="mb-4 text-base font-normal text-slate-600 bg-slate-50 p-4 rounded-lg border-l-4 border-blue-400 italic">"${story}"</div><div class="font-bold text-lg text-slate-800">${question}</div>`, ans: correctStr, opts: fillOptions(opts, correctStr), exp: explanation };
                 } else if (level === 'MOTS') {
-                    const isAdd = Math.random() > 0.5;
-                    let resN, resD = d1*d2;
-                    const contexts = [{ obj: "gula pasir", unit: "kg", add: "membeli lagi", sub: "digunakan" }, { obj: "pita", unit: "m", add: "menyambung", sub: "dipotong" }];
-                    const ctx = Utils.randChoice(contexts);
-                    if (isAdd) {
-                        resN = n1*d2 + n2*d1;
-                        story = `Ibu memiliki ${ctx.obj} sebanyak ${Utils.formatFraction(n1,d1)} ${ctx.unit}. Kemudian Ibu ${ctx.add} sebanyak ${Utils.formatFraction(n2,d2)} ${ctx.unit}.`;
-                        question = `Berapa total ${ctx.obj} Ibu sekarang?`;
-                        explanation = `Total = Awal + Tambahan = ${Utils.formatFraction(n1,d1)} + ${Utils.formatFraction(n2,d2)}.<br>Samakan penyebut: ${n1*d2}/${d1*d2} + ${n2*d1}/${d1*d2} = ${(n1*d2)+(n2*d1)}/${d1*d2}.`;
-                    } else {
-                        let v1 = n1/d1, v2 = n2/d2;
-                        let bigN=n1, bigD=d1, smN=n2, smD=d2;
-                        if(v2 > v1) { bigN=n2; bigD=d2; smN=n1; smD=d1; }
-                        resN = bigN*smD - smN*bigD; resD = bigD*smD;
-                        story = `Awalnya ada ${ctx.obj} sebanyak ${Utils.formatFraction(bigN,bigD)} ${ctx.unit}. Lalu ${ctx.sub} sebanyak ${Utils.formatFraction(smN,smD)} ${ctx.unit}.`;
-                        question = `Berapa sisa ${ctx.obj} sekarang?`;
-                        explanation = `Sisa = Awal - Digunakan = ${Utils.formatFraction(bigN,bigD)} - ${Utils.formatFraction(smN,smD)}.<br>Samakan penyebut: ${bigN*smD}/${bigD*smD} - ${smN*bigD}/${bigD*smD} = ${(bigN*smD)-(smN*bigD)}/${bigD*smD}.`;
-                    }
-                    const [sN, sD] = Utils.simplifyFraction(resN, resD);
-                    correctStr = Utils.formatFraction(sN, sD) + ` ${ctx.unit}`;
-                    explanation += `<br>Hasil disederhanakan menjadi: ${correctStr}.`;
+                    // Pilihan Ganda Kompleks (MCMA)
+                    // Pilih 2 jawaban yang benar
+                    const true1 = Utils.formatFraction(n1, d1);
+                    const true2 = Utils.formatFraction(n1*2, d1*2); // Pecahan senilai
+                    const false1 = Utils.formatFraction(n1+1, d1);
+                    const false2 = Utils.formatFraction(d1, n1);
+                    
+                    question = `Pilihlah DUA pecahan yang senilai dengan ${Utils.formatFraction(n1,d1)}.`;
+                    explanation = `${true2} diperoleh dengan mengalikan pembilang dan penyebut dengan 2.`;
+                    
+                    const options = [
+                        {text: true1, correct: true},
+                        {text: true2, correct: true},
+                        {text: false1, correct: false},
+                        {text: false2, correct: false}
+                    ];
+                    
+                    return { type: 'multiple', cat: "Bilangan", level: level, q: `<div class="font-bold text-lg text-slate-800">${question}</div>`, ans: options, exp: explanation };
                 } else {
-                    let v1 = n1/d1, v2 = n2/d2;
-                    let diffN, diffD = d1*d2;
-                    let name1 = "Andi", name2 = "Budi";
-                    let winner = v1 > v2 ? name1 : name2;
-                    if(v1 > v2) { diffN = n1*d2 - n2*d1; } else { diffN = n2*d1 - n1*d2; }
-                    const [sN, sD] = Utils.simplifyFraction(diffN, diffD);
-                    story = `${name1} memiliki tali sepanjang ${Utils.formatFraction(n1,d1)} meter, sedangkan ${name2} memiliki tali ${Utils.formatFraction(n2,d2)} meter.`;
-                    question = `Siapa yang memiliki tali lebih panjang dan berapa selisihnya?`;
-                    correctStr = `${winner}, ${Utils.formatFraction(sN, sD)} m`;
-                    opts.add(`${winner === name1 ? name2 : name1}, ${Utils.formatFraction(sN, sD)} m`);
-                    opts.add(`${winner}, ${Utils.formatFraction(sN+1, sD)} m`);
-                    explanation = `Bandingkan pecahan: ${name1} (${n1}/${d1} = ${n1*d2}/${d1*d2}) dan ${name2} (${n2}/${d2} = ${n2*d1}/${d1*d2}).<br>Yang lebih besar adalah ${winner}.<br>Selisihnya: Besar - Kecil = ${diffN}/${diffD} = ${Utils.formatFraction(sN, sD)} m.`;
+                    // Pilihan Ganda Kompleks Kategori (Benar/Salah)
+                    const v1 = n1/d1;
+                    question = `Tentukan Benar atau Salah untuk pernyataan mengenai pecahan ${Utils.formatFraction(n1,d1)}.`;
+                    const statements = [
+                        { text: `Pecahan tersebut lebih besar dari 1`, correct: v1 > 1 ? 'Benar' : 'Salah' },
+                        { text: `Pecahan tersebut senilai dengan ${Utils.formatFraction(n1*3, d1*3)}`, correct: 'Benar' },
+                        { text: `Jika ditambah 1 hasilnya ${Utils.formatFraction(n1+d1, d1)}`, correct: 'Benar' }
+                    ];
+                    explanation = `Analisis setiap pernyataan berdasarkan sifat pecahan.`;
+                    return { type: 'complex', cat: "Bilangan", level: level, q: `<div class="font-bold text-lg text-slate-800">${question}</div>`, ans: statements, exp: explanation };
                 }
-                opts.add(correctStr);
-                let safety = 0;
-                while(opts.size < 4 && safety < 20) {
-                    safety++;
-                    let fakeVal;
-                    if(level === 'HOTS' && question.includes("Siapa")) {
-                         const names = ["Andi", "Budi"];
-                         const n = Utils.randChoice(names);
-                         const v = Utils.formatFraction(Utils.randInt(1, 5), Utils.randChoice([2,3,4,5,6])) + " m";
-                         fakeVal = `${n}, ${v}`;
-                    } else {
-                        const fN = Utils.randInt(1, 10);
-                        const fD = Utils.randChoice([d1, d2, d1*d2]);
-                        const [sfN, sfD] = Utils.simplifyFraction(fN, fD);
-                        fakeVal = Utils.formatFraction(sfN, sfD) + (level !== 'LOTS' ? (level==='MOTS'?` ${story.includes('kg')?'kg':'m'}`:'') : '');
-                    }
-                    opts.add(fakeVal);
-                }
-                return { cat: "Bilangan", level: level, q: `<div class="mb-4 text-base font-normal text-slate-600 bg-slate-50 p-4 rounded-lg border-l-4 border-blue-400 italic">"${story}"</div><div class="font-bold text-lg text-slate-800">${question}</div>`, ans: correctStr, opts: Array.from(opts), exp: explanation };
             },
             geometry: () => {
                 const levels = ['LOTS', 'MOTS', 'HOTS'];
@@ -448,88 +421,104 @@
                 const l = Utils.randInt(3, 8);
                 let correctStr = "", story = "", question = "", vis = "", explanation = "";
                 let opts = new Set();
+                
+                vis = `<div style="width:${p*10}px;height:${l*10}px;border:2px solid #3b82f6;background:#dbeafe;display:flex;align-items:center;justify-content:center;font-size:10px;">${p}x${l}</div>`;
+
                 if (level === 'LOTS') {
-                    const isArea = Math.random() > 0.5;
-                    const ans = isArea ? p*l : 2*(p+l);
-                    story = `Sebuah persegi panjang memiliki panjang ${p} cm dan lebar ${l} cm.`;
-                    question = `Hitunglah ${isArea ? 'luas' : 'keliling'} bangun tersebut!`;
-                    correctStr = ans + (isArea ? " cm²" : " cm");
-                    vis = `<div style="width:${p*10}px;height:${l*10}px;border:2px solid #3b82f6;background:#dbeafe;display:flex;align-items:center;justify-content:center;font-size:10px;">${p}x${l}</div>`;
-                    explanation = isArea ? `Rumus Luas = Panjang × Lebar<br>L = ${p} × ${l} = ${ans} cm²` : `Rumus Keliling = 2 × (Panjang + Lebar)<br>K = 2 × (${p} + ${l}) = 2 × ${p+l} = ${ans} cm`;
+                    const ans = p*l;
+                    story = `Persegi panjang dengan p=${p} cm dan l=${l} cm.`;
+                    question = `Hitunglah luas bangun tersebut!`;
+                    correctStr = ans + " cm²";
+                    explanation = `L = p x l = ${p} x ${l} = ${ans}`;
+                    opts.add(correctStr);
+                    return { type: 'single', cat: "Geometri", level: level, q: `<div class="mb-4 text-base font-normal text-slate-600 bg-green-50 p-4 rounded-lg border-l-4 border-green-400 italic">"${story}"</div><div class="font-bold text-lg text-slate-800">${question}</div>`, ans: correctStr, opts: fillOptions(opts, ans + " cm²"), vis: vis, exp: explanation };
                 } else if (level === 'MOTS') {
-                    const isArea = Math.random() > 0.5;
-                    const ans = isArea ? p*l : 2*(p+l);
-                    const ctx = isArea ? { t: "kertas karton", a: "luas kertas", u: "cm²" } : { t: "bingkai foto", a: "panjang kayu bingkai", u: "cm" };
-                    story = `Budi ingin membuat ${ctx.t} dengan ukuran panjang ${p} cm dan lebar ${l} cm.`;
-                    question = `Berapakah ${ctx.a} yang dibutuhkan?`;
-                    correctStr = ans + " " + ctx.u;
-                    explanation = isArea ? `Untuk mencari ${ctx.a}, gunakan rumus Luas: p × l.<br>${p} × ${l} = ${ans} ${ctx.u}.` : `Untuk mencari ${ctx.a}, gunakan rumus Keliling: 2(p+l).<br>2 × (${p} + ${l}) = ${ans} ${ctx.u}.`;
+                    // Checkbox
+                    const k = 2 * (p+l);
+                    const L = p * l;
+                    question = `Pilih semua pernyataan yang BENAR mengenai bangun dengan p=${p} cm dan l=${l} cm.`;
+                    const options = [
+                        { text: `Luasnya adalah ${L} cm²`, correct: true },
+                        { text: `Kelilingnya adalah ${k} cm`, correct: true },
+                        { text: `Luasnya adalah ${k} cm²`, correct: false },
+                        { text: `Kelilingnya adalah ${L} cm`, correct: false }
+                    ];
+                    explanation = `Hitung Luas (${L}) dan Keliling (${k}) secara terpisah.`;
+                    return { type: 'multiple', cat: "Geometri", level: level, q: `<div class="font-bold text-lg text-slate-800">${question}</div>`, ans: options, vis: vis, exp: explanation };
                 } else {
-                    const area = p * l;
-                    story = `Sebuah kebun berbentuk persegi panjang memiliki Luas ${area} m². Jika panjangnya ${p} m.`;
-                    question = `Berapakah lebar kebun tersebut?`;
-                    correctStr = `${l} m`;
-                    opts.add(`${l+2} m`); opts.add(`${p} m`); opts.add(`${Math.floor(area/2)} m`);
-                    explanation = `Diketahui Luas = ${area}, Panjang = ${p}.<br>Rumus Luas = p × l, maka Lebar = Luas ÷ Panjang.<br>Lebar = ${area} ÷ ${p} = ${l} m.`;
+                    // Complex Table
+                    question = `Tentukan pernyataan Benar/Salah untuk bangun persegi panjang ${p}x${l} cm.`;
+                    const statements = [
+                        { text: `Merupakan bangun datar segiempat`, correct: 'Benar' },
+                        { text: `Memiliki 4 simetri lipat`, correct: 'Salah' }, // Persegi panjang cuma 2
+                        { text: `Semua sudutnya 90 derajat`, correct: 'Benar' }
+                    ];
+                    explanation = `Persegi panjang adalah segiempat dengan 4 sudut siku-siku dan 2 simetri lipat.`;
+                    return { type: 'complex', cat: "Geometri", level: level, q: `<div class="font-bold text-lg text-slate-800">${question}</div>`, ans: statements, vis: vis, exp: explanation };
                 }
-                opts.add(correctStr);
-                while(opts.size < 4) {
-                    const val = Utils.randInt(10, 100);
-                    const unit = correctStr.includes('²') ? "cm²" : (correctStr.includes('m') ? "m" : "cm");
-                    opts.add(val + " " + unit);
-                }
-                return { cat: "Geometri", level: level, q: `<div class="mb-4 text-base font-normal text-slate-600 bg-green-50 p-4 rounded-lg border-l-4 border-green-400 italic">"${story}"</div><div class="font-bold text-lg text-slate-800">${question}</div>`, ans: correctStr, opts: Array.from(opts), vis: vis, exp: explanation };
             },
             data: () => {
                 const levels = ['LOTS', 'MOTS', 'HOTS'];
                 const level = Utils.randChoice(levels);
-                const data = [Utils.randInt(20,50), Utils.randInt(20,50), Utils.randInt(20,50), Utils.randInt(20,50)];
-                const labels = ["Jan", "Feb", "Mar", "Apr"];
-                const max = Math.max(...data);
-                const min = Math.min(...data);
+                const data = [Utils.randInt(20,50), Utils.randInt(20,50), Utils.randInt(20,50)];
+                const labels = ["A", "B", "C"];
                 let question = "", ans = "", explanation = "";
-                let opts = new Set();
-                if (level === 'LOTS') {
-                    question = "Bulan apa yang memiliki nilai tertinggi?";
-                    ans = labels[data.indexOf(max)];
-                    labels.forEach(l => opts.add(l));
-                    explanation = `Lihat diagram batang tertinggi. Nilai tertinggi adalah ${max} pada bulan ${ans}.`;
-                } else if (level === 'MOTS') {
-                    question = "Berapa jumlah total data pada bulan Januari dan Maret?";
-                    ans = (data[0] + data[2]).toString();
-                    explanation = `Nilai Jan = ${data[0]}, Nilai Mar = ${data[2]}.<br>Jumlah = ${data[0]} + ${data[2]} = ${ans}.`;
-                } else {
-                    if(Math.random() > 0.5) {
-                        question = "Berapa selisih antara nilai tertinggi dan terendah?";
-                        ans = (max - min).toString();
-                        explanation = `Nilai tertinggi = ${max}, Nilai terendah = ${min}.<br>Selisih = ${max} - ${min} = ${ans}.`;
-                    } else {
-                        question = "Jika rata-rata target adalah 40, bulan apa saja yang di atas target?";
-                        const passed = labels.filter((_,i) => data[i] > 40);
-                        ans = passed.length > 0 ? passed.join(", ") : "Tidak ada";
-                        if(ans === "Tidak ada") { opts.add("Jan, Feb"); opts.add("Semua Bulan"); opts.add("Mar"); } 
-                        else { opts.add(passed[0] || "Jan"); }
-                        explanation = `Cari bulan dengan nilai > 40.<br>Data: Jan(${data[0]}), Feb(${data[1]}), Mar(${data[2]}), Apr(${data[3]}).<br>Yang > 40: ${ans}.`;
-                    }
-                }
-                if(level !== 'LOTS') {
-                    opts.add(ans);
-                    while(opts.size < 4) { opts.add((parseInt(ans) || 0) + Utils.randChoice([-5, 5, 10, -10, 20])); }
-                }
+                
                 let html = `<div class="w-full flex flex-col items-center"><div class="flex items-end gap-4 h-40 border-b-2 border-slate-300 pb-1 px-4 w-full max-w-md mx-auto">`; 
                 data.forEach((v, i) => {
                     const heightPercent = (v/Math.max(...data, 60))*100;
                     html += `<div class="flex-1 flex flex-col justify-end group relative h-full"><div class="w-full bg-indigo-500 rounded-t" style="height:${heightPercent}%"><span class="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs font-bold text-indigo-700">${v}</span></div></div>`;
                 });
                 html += `</div><div class="flex text-xs mt-2 gap-4 text-slate-600 font-bold w-full max-w-md mx-auto">${labels.map(l=>`<div class="flex-1 text-center">${l}</div>`).join('')}</div></div>`;
-                return { cat: "Data", level: level, q: `<div class="mb-4 text-base font-normal text-slate-600 bg-white p-2 rounded-lg border border-slate-200">Data Penjualan Bulanan:</div>${html}<div class="mt-6 font-bold text-lg text-slate-800 border-t pt-4">${question}</div>`, ans: ans, opts: Array.from(opts), vis: null, exp: explanation };
+
+                if (level === 'LOTS') {
+                    // Single Choice
+                    const maxVal = Math.max(...data);
+                    const idx = data.indexOf(maxVal);
+                    question = `Data manakah yang memiliki nilai tertinggi?`;
+                    ans = labels[idx];
+                    explanation = `Nilai tertinggi adalah ${maxVal} pada data ${ans}.`;
+                    return { type: 'single', cat: "Data", level: level, q: `<div class="mb-4 text-base font-normal text-slate-600 bg-white p-2 rounded-lg border border-slate-200">Grafik Data:</div>${html}<div class="mt-6 font-bold text-lg text-slate-800 border-t pt-4">${question}</div>`, ans: ans, opts: labels, exp: explanation };
+                } else if (level === 'MOTS') {
+                    // Multiple Choice
+                    const avg = (data.reduce((a,b)=>a+b,0)/3).toFixed(1);
+                    question = `Pilih pernyataan yang sesuai dengan data tersebut.`;
+                    const options = [
+                        { text: `Data A bernilai ${data[0]}`, correct: true },
+                        { text: `Data B lebih besar dari Data A`, correct: data[1] > data[0] },
+                        { text: `Jumlah total data adalah ${data[0]+data[1]+data[2]}`, correct: true },
+                        { text: `Data C adalah yang terkecil`, correct: data[2] === Math.min(...data) }
+                    ];
+                    explanation = `Cek satu per satu nilai pada grafik.`;
+                    return { type: 'multiple', cat: "Data", level: level, q: `<div class="mb-4 text-base font-normal text-slate-600 bg-white p-2 rounded-lg border border-slate-200">Grafik Data:</div>${html}<div class="mt-6 font-bold text-lg text-slate-800 border-t pt-4">${question}</div>`, ans: options, exp: explanation };
+                } else {
+                    // Complex
+                    question = `Tentukan Benar/Salah berdasarkan grafik.`;
+                    const statements = [
+                        { text: `Selisih A dan B adalah ${Math.abs(data[0]-data[1])}`, correct: 'Benar' },
+                        { text: `Rata-rata data lebih dari 10`, correct: 'Benar' },
+                        { text: `Semua data bernilai genap`, correct: data.every(x => x%2===0) ? 'Benar' : 'Salah' }
+                    ];
+                    explanation = `Analisis data secara detail.`;
+                    return { type: 'complex', cat: "Data", level: level, q: `<div class="mb-4 text-base font-normal text-slate-600 bg-white p-2 rounded-lg border border-slate-200">Grafik Data:</div>${html}<div class="mt-6 font-bold text-lg text-slate-800 border-t pt-4">${question}</div>`, ans: statements, exp: explanation };
+                }
             }
         };
+
+        function fillOptions(optsSet, correctVal) {
+            let opts = Array.from(optsSet);
+            while(opts.length < 4) {
+                // Generate fake number/string loosely based on correct val
+                // Simple logic for demo
+                opts.push(Utils.randInt(1, 100) + (typeof correctVal==='string' && correctVal.includes('cm') ? ' cm' : ''));
+            }
+            return Utils.shuffle(opts);
+        }
 
         const app = {
             user: { code: '', name: '', gender: '', dob: '', token: '' },
             questions: [],
-            answers: [],
+            answers: [], // Stores answer for each question. Structure depends on type.
             currIdx: 0,
             timer: null,
             time: 3600,
@@ -582,27 +571,15 @@
                 document.getElementById('confirmation-screen').classList.remove('hidden');
             },
 
-            // --- FUNGSI BARU UNTUK MODE AMAN ---
             enableExamMode: () => {
-                // 1. Fullscreen
                 const docElm = document.documentElement;
-                if (docElm.requestFullscreen) {
-                    docElm.requestFullscreen().catch((err) => {
-                        console.log("Fullscreen ditolak atau tidak didukung:", err);
-                    });
-                }
-
-                // 2. Disable Back Button (Manipulasi History)
+                if (docElm.requestFullscreen) { docElm.requestFullscreen().catch((err) => {}); }
                 history.pushState(null, null, location.href);
                 window.onpopstate = function () {
                     history.pushState(null, null, location.href);
                     app.showModal("Mode Ujian Aktif: Navigasi Kembali dinonaktifkan.", 'alert');
                 };
-
-                // 3. Prevent Refresh/Close Tab Warning
-                window.onbeforeunload = function() {
-                    return "Ujian sedang berlangsung. Apakah Anda yakin ingin keluar? Data mungkin hilang.";
-                };
+                window.onbeforeunload = function() { return "Ujian sedang berlangsung."; };
             },
 
             confirmData: () => {
@@ -610,21 +587,10 @@
                 const gender = document.getElementById('input-gender').value;
                 const dob = document.getElementById('input-dob').value;
                 const manualToken = document.getElementById('input-token').value.trim().toUpperCase();
-                if (!name || !gender || !dob) {
-                    app.showModal("Mohon lengkapi Nama, Jenis Kelamin, dan Tanggal Lahir!", 'alert');
-                    return;
-                }
-                if (manualToken !== app.user.token) {
-                    app.showModal("Token Ujian tidak sesuai! Mohon periksa kembali token yang tertera.", 'alert');
-                    return;
-                }
-                app.user.name = name;
-                app.user.gender = gender;
-                app.user.dob = dob;
-                
-                // AKTIFKAN MODE AMAN SAAT MULAI
+                if (!name || !gender || !dob) { app.showModal("Lengkapi data diri!", 'alert'); return; }
+                if (manualToken !== app.user.token) { app.showModal("Token salah!", 'alert'); return; }
+                app.user.name = name; app.user.gender = gender; app.user.dob = dob;
                 app.enableExamMode();
-
                 document.getElementById('confirmation-screen').classList.add('hidden');
                 document.getElementById('quiz-screen').classList.remove('hidden');
                 document.getElementById('user-info-display').classList.remove('hidden');
@@ -636,11 +602,11 @@
 
             generateQuestions: () => {
                 app.questions = [];
-                for(let i=0; i<12; i++) app.questions.push(Generators.fractionOps());
-                for(let i=0; i<12; i++) app.questions.push(Generators.geometry());
-                for(let i=0; i<6; i++) app.questions.push(Generators.data());
+                for(let i=0; i<10; i++) app.questions.push(Generators.fractionOps());
+                for(let i=0; i<10; i++) app.questions.push(Generators.geometry());
+                for(let i=0; i<10; i++) app.questions.push(Generators.data());
                 app.questions = Utils.shuffle(app.questions);
-                app.questions.forEach(q => q.opts = Utils.shuffle(q.opts)); 
+                // No shuffle for opts inside here, logic moved to generators/render
                 app.answers = new Array(30).fill(null);
             },
 
@@ -664,24 +630,88 @@
                 document.getElementById('category-badge').innerText = q.cat;
                 const lvlBadge = document.getElementById('level-badge');
                 lvlBadge.innerText = q.level;
+                
                 if(q.level === 'LOTS') lvlBadge.className = "bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider border border-green-200";
                 else if(q.level === 'MOTS') lvlBadge.className = "bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider border border-yellow-200";
                 else lvlBadge.className = "bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider border border-red-200";
+
                 document.getElementById('question-text').innerHTML = q.q;
                 const vis = document.getElementById('visual-container');
                 if(q.vis) { vis.innerHTML = q.vis; vis.classList.remove('hidden'); } else vis.classList.add('hidden');
-                const opts = document.getElementById('options-container');
-                opts.innerHTML = '';
-                const labels = ['A', 'B', 'C', 'D'];
-                q.opts.forEach((opt, i) => {
-                    const btn = document.createElement('button');
-                    const isSel = app.answers[idx] === opt;
-                    const label = labels[i] || '';
-                    btn.className = `w-full text-left p-3 rounded-lg border-2 transition flex items-center gap-3 ${isSel ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-blue-300 bg-white'}`;
-                    btn.innerHTML = `<div class="flex-shrink-0 h-8 w-8 rounded-full ${isSel ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'} flex items-center justify-center font-bold text-sm border ${isSel ? 'border-blue-600' : 'border-slate-300'}">${label}</div><span class="text-slate-700 font-medium">${opt}</span>`;
-                    btn.onclick = () => { app.answers[idx] = opt; app.loadQ(idx); app.updateNav(); };
-                    opts.appendChild(btn);
-                });
+                
+                const typeHint = document.getElementById('question-type-hint');
+                const optsContainer = document.getElementById('options-container');
+                optsContainer.innerHTML = '';
+
+                // RENDER BASED ON TYPE
+                if (q.type === 'single') {
+                    typeHint.innerText = "Pilih satu jawaban yang benar.";
+                    const labels = ['A', 'B', 'C', 'D'];
+                    q.opts.forEach((opt, i) => {
+                        const btn = document.createElement('button');
+                        const isSel = app.answers[idx] === opt;
+                        btn.className = `w-full text-left p-3 rounded-lg border-2 transition flex items-center gap-3 mb-3 ${isSel ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-blue-300 bg-white'}`;
+                        btn.innerHTML = `<div class="flex-shrink-0 h-8 w-8 rounded-full ${isSel ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'} flex items-center justify-center font-bold text-sm border ${isSel ? 'border-blue-600' : 'border-slate-300'}">${labels[i]||''}</div><span class="text-slate-700 font-medium">${opt}</span>`;
+                        btn.onclick = () => { app.answers[idx] = opt; app.loadQ(idx); app.updateNav(); };
+                        optsContainer.appendChild(btn);
+                    });
+                } 
+                else if (q.type === 'multiple') {
+                    typeHint.innerText = "Pilih lebih dari satu jawaban yang benar (Kotak Centang).";
+                    const currentAns = app.answers[idx] || [];
+                    q.ans.forEach((optData, i) => {
+                        // For multiple type, q.ans contains all options including correct status
+                        // But we shuffle rendering. Wait, q.ans is the source of truth.
+                        // Let's iterate q.ans directly (assuming they are shuffled in generator)
+                        const isChecked = currentAns.includes(i);
+                        const div = document.createElement('label');
+                        div.className = "flex items-start p-3 border-2 rounded-lg cursor-pointer transition hover:bg-slate-50 checkbox-wrapper mb-3 " + (isChecked ? 'border-blue-500 bg-blue-50' : 'border-slate-200');
+                        div.innerHTML = `
+                            <input type="checkbox" class="hidden" ${isChecked ? 'checked' : ''}>
+                            <div class="w-6 h-6 border-2 border-slate-300 rounded flex items-center justify-center mr-3 bg-white transition">
+                                <svg class="w-4 h-4 text-white check-icon hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="text-slate-700 font-medium select-none">${optData.text}</span>
+                        `;
+                        div.querySelector('input').addEventListener('change', (e) => {
+                            let newAns = app.answers[idx] || [];
+                            if(e.target.checked) newAns.push(i);
+                            else newAns = newAns.filter(x => x !== i);
+                            app.answers[idx] = newAns;
+                            app.updateNav();
+                            // Update style manually for immediate feedback
+                            div.className = "flex items-start p-3 border-2 rounded-lg cursor-pointer transition hover:bg-slate-50 checkbox-wrapper mb-3 " + (e.target.checked ? 'border-blue-500 bg-blue-50' : 'border-slate-200');
+                        });
+                        optsContainer.appendChild(div);
+                    });
+                } 
+                else if (q.type === 'complex') {
+                    typeHint.innerText = "Tentukan Benar atau Salah untuk setiap pernyataan.";
+                    const currentAns = app.answers[idx] || {};
+                    const table = document.createElement('table');
+                    table.className = "w-full text-sm border-collapse complex-table rounded-lg overflow-hidden border border-slate-200";
+                    table.innerHTML = `<thead><tr><th>Pernyataan</th><th class="w-20 text-center">Benar</th><th class="w-20 text-center">Salah</th></tr></thead><tbody></tbody>`;
+                    const tbody = table.querySelector('tbody');
+                    q.ans.forEach((item, i) => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${item.text}</td>
+                            <td class="text-center"><input type="radio" name="row-${i}" value="Benar" ${currentAns[i] === 'Benar' ? 'checked' : ''} class="w-5 h-5 text-blue-600"></td>
+                            <td class="text-center"><input type="radio" name="row-${i}" value="Salah" ${currentAns[i] === 'Salah' ? 'checked' : ''} class="w-5 h-5 text-red-600"></td>
+                        `;
+                        // Add listeners
+                        tr.querySelectorAll('input').forEach(radio => {
+                            radio.addEventListener('change', (e) => {
+                                if (!app.answers[idx]) app.answers[idx] = {};
+                                app.answers[idx][i] = e.target.value;
+                                app.updateNav();
+                            });
+                        });
+                        tbody.appendChild(tr);
+                    });
+                    optsContainer.appendChild(table);
+                }
+
                 const prevBtn = document.getElementById('btn-prev');
                 const nextBtn = document.getElementById('btn-next');
                 if(prevBtn) prevBtn.disabled = idx === 0;
@@ -721,42 +751,82 @@
             updateNav: () => {
                 for(let i=0; i<30; i++) {
                     const btn = document.getElementById(`nav-${i}`);
-                    btn.className = `h-8 w-8 rounded text-xs font-bold transition ${i === app.currIdx ? 'ring-2 ring-blue-500 bg-white' : (app.answers[i] ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600')}`;
+                    // Check if answered based on type
+                    let answered = false;
+                    const ans = app.answers[i];
+                    const type = app.questions[i].type;
+                    if (type === 'single' && ans) answered = true;
+                    if (type === 'multiple' && ans && ans.length > 0) answered = true;
+                    if (type === 'complex' && ans && Object.keys(ans).length > 0) answered = true;
+
+                    btn.className = `h-8 w-8 rounded text-xs font-bold transition ${i === app.currIdx ? 'ring-2 ring-blue-500 bg-white' : (answered ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600')}`;
                 }
             },
 
             finishQuiz: () => {
-                app.showModal("Apakah Anda yakin ingin menyelesaikan ujian ini? Jawaban tidak dapat diubah setelah ini.", 'confirm', async () => {
+                app.showModal("Apakah Anda yakin ingin menyelesaikan ujian ini?", 'confirm', async () => {
                     clearInterval(app.timer);
-                    // Hapus listener 'beforeunload' agar bisa keluar tanpa peringatan
                     window.onbeforeunload = null; 
                     
                     let correct = 0;
-                    
                     const discussionContent = document.getElementById('discussion-content');
                     discussionContent.innerHTML = '';
 
                     app.questions.forEach((q, i) => { 
-                        const isCorrect = app.answers[i] === q.ans;
-                        if(isCorrect) correct++; 
+                        let isCorrect = false;
+                        let userAnswerDisplay = "";
+                        let keyDisplay = "";
+
+                        // SCORING LOGIC
+                        if (q.type === 'single') {
+                            isCorrect = app.answers[i] === q.ans;
+                            userAnswerDisplay = app.answers[i] || "-";
+                            keyDisplay = q.ans;
+                        } 
+                        else if (q.type === 'multiple') {
+                            const userAns = app.answers[i] || [];
+                            // Logic: Check if ALL correct options are selected AND NO wrong options selected
+                            const correctIndices = q.ans.map((opt, idx) => opt.correct ? idx : -1).filter(idx => idx !== -1);
+                            const userCorrect = userAns.every(idx => correctIndices.includes(idx));
+                            const userComplete = correctIndices.every(idx => userAns.includes(idx));
+                            isCorrect = userCorrect && userComplete;
+                            
+                            userAnswerDisplay = userAns.map(idx => q.ans[idx].text).join(", ") || "-";
+                            keyDisplay = q.ans.filter(o => o.correct).map(o => o.text).join(", ");
+                        } 
+                        else if (q.type === 'complex') {
+                            const userAns = app.answers[i] || {};
+                            let allMatch = true;
+                            let userText = [];
+                            let keyText = [];
+                            q.ans.forEach((stmt, idx) => {
+                                const uVal = userAns[idx] || "-";
+                                if (uVal !== stmt.correct) allMatch = false;
+                                userText.push(`${stmt.text.substring(0,20)}...: ${uVal}`);
+                                keyText.push(`${stmt.text.substring(0,20)}...: ${stmt.correct}`);
+                            });
+                            isCorrect = allMatch;
+                            userAnswerDisplay = `<ul class="text-xs list-disc pl-4">${userText.map(t=>`<li>${t}</li>`).join('')}</ul>`;
+                            keyDisplay = `<ul class="text-xs list-disc pl-4">${keyText.map(t=>`<li>${t}</li>`).join('')}</ul>`;
+                        }
+
+                        if(isCorrect) correct++;
                         
-                        // Generate Discussion Item HTML
                         const item = document.createElement('div');
                         item.className = `page-break mb-6 p-4 border rounded-lg ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`;
                         item.innerHTML = `
                             <div class="font-bold text-slate-700 mb-2 flex justify-between">
-                                <span>Soal ${i+1} (${q.level})</span>
+                                <span>Soal ${i+1} (${q.type === 'single' ? 'PG' : (q.type==='multiple'?'PG Kompleks':'Benar/Salah')})</span>
                                 <span class="${isCorrect ? 'text-green-600' : 'text-red-600'} text-xs font-bold uppercase border px-2 rounded ${isCorrect ? 'border-green-300 bg-green-100' : 'border-red-300 bg-red-100'}">${isCorrect ? 'Benar' : 'Salah'}</span>
                             </div>
                             <div class="mb-3 text-sm text-slate-800">${q.q}</div>
                             ${q.vis ? `<div class="mb-3 flex justify-center">${q.vis}</div>` : ''}
                             <div class="text-sm grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
-                                <p class="bg-white p-2 rounded border border-slate-200"><strong>Jawaban Anda:</strong> <span class="${isCorrect ? 'text-green-700 font-bold' : 'text-red-700 font-bold'}">${app.answers[i] || 'Tidak dijawab'}</span></p>
-                                <p class="bg-white p-2 rounded border border-slate-200"><strong>Kunci Jawaban:</strong> <span class="text-green-700 font-bold">${q.ans}</span></p>
+                                <div class="bg-white p-2 rounded border border-slate-200"><strong>Jawaban Anda:</strong><br>${userAnswerDisplay}</div>
+                                <div class="bg-white p-2 rounded border border-slate-200"><strong>Kunci Jawaban:</strong><br>${keyDisplay}</div>
                             </div>
                             <div class="mt-2 p-3 bg-white rounded border border-slate-300 text-sm text-slate-600 shadow-sm">
-                                <strong class="text-blue-600 block mb-1">Pembahasan:</strong>
-                                ${q.exp}
+                                <strong class="text-blue-600 block mb-1">Pembahasan:</strong>${q.exp}
                             </div>
                         `;
                         discussionContent.appendChild(item);
@@ -773,11 +843,12 @@
                         await app.saveScore(score);
                         app.loadLeaderboard();
                     } else {
-                        document.getElementById('leaderboard-body').innerHTML = '<tr><td colspan="4" class="p-4 text-center text-orange-500">Mode Offline: Data tidak disimpan ke server.</td></tr>';
+                        document.getElementById('leaderboard-body').innerHTML = '<tr><td colspan="4" class="p-4 text-center text-orange-500">Mode Offline: Data tidak disimpan.</td></tr>';
                     }
                 });
             },
 
+            // ... saveScore and loadLeaderboard remains same as before ...
             saveScore: async (score) => {
                 if(!db || !auth.currentUser) return;
                 try {
@@ -789,10 +860,7 @@
                          collectionRef = collection(db, COLLECTION_NAME);
                     }
                     await addDoc(collectionRef, { 
-                        code: app.user.code, 
-                        name: app.user.name, 
-                        score: score, 
-                        timestamp: serverTimestamp() 
+                        code: app.user.code, name: app.user.name, score: score, timestamp: serverTimestamp() 
                     });
                 } catch (e) { console.error("Save Error", e); }
             },
@@ -822,7 +890,7 @@
                     document.getElementById('loading-leaderboard').classList.add('hidden');
                 }, (error) => {
                     console.error("Leaderboard Error:", error);
-                    document.getElementById('leaderboard-body').innerHTML = `<tr><td colspan="4" class="text-center text-red-500 text-xs">Gagal memuat data (Izin ditolak atau Offline).<br>Cek Console Log.</td></tr>`;
+                    document.getElementById('leaderboard-body').innerHTML = `<tr><td colspan="4" class="text-center text-red-500 text-xs">Gagal memuat data.</td></tr>`;
                 });
             }
         };
