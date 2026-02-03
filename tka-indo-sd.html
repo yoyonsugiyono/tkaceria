@@ -21,16 +21,13 @@
         body { font-family: 'Nunito', sans-serif; background-color: #f0f9ff; }
         .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
         
-        /* Animations */
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .fade-in { animation: fadeIn 0.5s ease-out forwards; }
 
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
 
-        /* Reading Text Box Styling */
         .reading-text {
             background-color: #f8fafc;
             border-left: 4px solid #3b82f6;
@@ -46,11 +43,17 @@
             box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
         }
 
-        /* Loader */
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* PRINT STYLES */
+        /* Styles for Complex Inputs */
+        .checkbox-wrapper input:checked + div { background-color: #eff6ff; border-color: #3b82f6; color: #1d4ed8; }
+        .checkbox-wrapper input:checked + div .check-icon { display: block; }
+        
+        .complex-table th, .complex-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        .complex-table th { background-color: #f8fafc; font-weight: 700; color: #475569; }
+        .complex-table tr:hover { background-color: #f1f5f9; }
+
         @media print {
             body { background: white !important; color: black !important; }
             body * { visibility: hidden; }
@@ -199,8 +202,10 @@
                 <div class="flex-grow p-6 md:p-10">
                     <!-- Reading Text Area -->
                     <div id="question-text" class="mb-4"></div>
+                    <div id="question-type-hint" class="mb-4 text-sm font-semibold text-blue-600 italic"></div>
                     
-                    <div id="options-container" class="grid grid-cols-1 gap-3"></div>
+                    <div id="options-container" class="w-full"></div>
+
                     <div class="flex justify-between items-center mt-10 pt-6 border-t border-slate-100">
                         <button onclick="app.prevQuestion()" id="btn-prev" class="flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition disabled:opacity-50 disabled:cursor-not-allowed">
                             Soal Sebelumnya
@@ -269,9 +274,7 @@
             <!-- Bagian Pembahasan -->
             <div id="discussion-section" class="hidden mt-8 text-left border-t-2 border-slate-200 pt-8">
                 <h3 class="font-bold text-2xl text-slate-800 mb-6 text-center">Pembahasan Soal</h3>
-                <div id="discussion-content" class="space-y-6">
-                    <!-- Konten Pembahasan akan di-inject lewat JS -->
-                </div>
+                <div id="discussion-content" class="space-y-6"></div>
             </div>
         </div>
 
@@ -366,11 +369,7 @@
             }
         };
 
-        // --- PROCEDURAL CONTENT GENERATION (AI ENGINE) ---
-        // Engine ini bertugas membuat teks dan soal baru berdasarkan kisi-kisi
-        
         const ContentEngine = {
-            // Data untuk Fiksi (Fabel)
             fictionData: {
                 chars: [
                     { name: "Kancil", trait: "cerdik", action: "mengelabui" },
@@ -388,16 +387,17 @@
                 generate: function() {
                     const char1 = Utils.randChoice(this.chars);
                     let char2 = Utils.randChoice(this.chars);
-                    while(char1.name === char2.name) char2 = Utils.randChoice(this.chars); // Ensure different chars
+                    while(char1.name === char2.name) char2 = Utils.randChoice(this.chars); 
                     const place = Utils.randChoice(this.settings);
                     const plot = Utils.randChoice(this.plots);
 
                     const title = `Kisah ${char1.name} dan ${char2.name}`;
                     const text = `Di sebuah ${place}, hiduplah seekor ${char1.name} yang terkenal ${char1.trait}. Suatu hari, ia sedang ${char1.action} ketika bertemu dengan ${char2.name}.\n\n${char2.name} adalah hewan yang berbeda, namun hari itu mereka terlibat masalah. Mereka ${plot.conflict}. Suasana menjadi tegang. ${char1.name} berusaha mencari jalan keluar dengan sifatnya yang ${char1.trait}.\n\nAkhirnya, mereka menyadari kesalahan masing-masing. Mereka memutuskan untuk ${plot.resolution}. Sejak saat itu, mereka hidup rukun di ${place}.`;
 
-                    // Generate Questions based on metadata
+                    // Generate varied question types
                     const questions = [
                         {
+                            type: 'single',
                             q: `Siapakah tokoh dalam cerita yang memiliki sifat ${char1.trait}?`,
                             a: char1.name,
                             opts: [char1.name, char2.name, "Singa", "Burung Hantu"],
@@ -405,25 +405,34 @@
                             exp: `Dalam teks disebutkan: "...hiduplah seekor ${char1.name} yang terkenal ${char1.trait}."`
                         },
                         {
-                            q: `Di manakah latar tempat cerita tersebut?`,
-                            a: place,
-                            opts: this.settings, // All settings as options
-                            level: "LOTS",
-                            exp: `Kalimat pertama teks menyebutkan: "Di sebuah ${place}..."`
+                            type: 'multiple',
+                            q: `Pilihlah DUA karakter yang muncul dalam cerita di atas.`,
+                            a: [
+                                {text: char1.name, correct: true},
+                                {text: char2.name, correct: true},
+                                {text: 'Harimau', correct: false},
+                                {text: 'Buaya', correct: false}
+                            ],
+                            level: "MOTS",
+                            exp: `Karakter utama adalah ${char1.name} dan ${char2.name}.`
                         },
                         {
-                            q: `Apa pesan moral yang dapat diambil dari cerita di atas?`,
-                            a: `Kita harus ${plot.resolution}.`,
-                            opts: [`Kita harus ${plot.conflict}.`, `Kita harus ${plot.resolution}.`, "Kita harus menghindari hutan.", "Kita harus menjadi kuat."],
+                            type: 'complex',
+                            q: `Tentukan pernyataan Benar/Salah berdasarkan cerita.`,
+                            a: [
+                                {text: `Latar tempat cerita adalah ${place}`, correct: 'Benar'},
+                                {text: `Mereka berkonflik karena ${plot.conflict}`, correct: 'Benar'},
+                                {text: `Cerita berakhir menyedihkan`, correct: 'Salah'}
+                            ],
                             level: "HOTS",
-                            exp: `Di akhir cerita, tokoh memutuskan untuk ${plot.resolution}, yang mengajarkan kita tentang kerukunan.`
+                            exp: `Latar tempat ${place}, konflik ${plot.conflict}, dan akhir bahagia (${plot.resolution}).`
                         }
                     ];
-                    return { title, text, questions: Utils.shuffle(questions)[0] }; // Return 1 random question per text generation
+                    // Select one question randomly from the set
+                    return { title, text, questions: Utils.shuffle(questions)[0] };
                 }
             },
 
-            // Data untuk Teks Informasi
             infoData: {
                 topics: [
                     { title: "Manfaat Minum Air Putih", content: "Air putih sangat penting bagi tubuh. Tubuh manusia sebagian besar terdiri dari air. Minum air membantu menjaga suhu tubuh, melancarkan pencernaan, dan mencegah dehidrasi. Kurang minum dapat menyebabkan sakit kepala dan lemas.", key: "mencegah dehidrasi" },
@@ -433,39 +442,39 @@
                 generate: function() {
                     const topic = Utils.randChoice(this.topics);
                     
-                    // Generate Question
                     const questions = [
                         {
-                            q: `Apa gagasan pokok dari teks berjudul "${topic.title}"?`,
-                            a: topic.title.replace("Manfaat", "Pentingnya").replace("Pentingnya", "Manfaat") + " bagi kesehatan.", 
-                            // Simple logic to create slightly different answer text
-                            opts: [
-                                topic.title.replace("Manfaat", "Pentingnya").replace("Pentingnya", "Manfaat") + " bagi kesehatan.",
-                                "Cara membuat makanan enak.",
-                                "Bahaya tidur terlalu malam.",
-                                "Jenis-jenis olahraga pagi."
-                            ],
-                            level: "MOTS",
-                            exp: `Teks membahas secara keseluruhan tentang ${topic.title}.`
+                            type: 'single',
+                            q: `Salah satu manfaat yang disebutkan dalam teks adalah...`,
+                            a: topic.key,
+                            opts: [topic.key, "membuat mengantuk", "menambah berat badan", "membuat kulit gatal"],
+                            level: "LOTS",
+                            exp: `Teks secara tersurat menyebutkan manfaat: ${topic.key}.`
                         },
                         {
-                            q: `Berdasarkan teks, apa akibat jika kita mengabaikan hal tersebut?`,
-                            a: "Dapat menyebabkan gangguan kesehatan.",
-                            opts: ["Tubuh menjadi lebih kuat.", "Dapat menyebabkan gangguan kesehatan.", "Pikiran menjadi lebih tenang.", "Gigi menjadi lebih putih."],
+                            type: 'multiple',
+                            q: `Pilihlah pernyataan yang SESUAI dengan isi teks.`,
+                            a: [
+                                {text: `Teks membahas tentang ${topic.title}`, correct: true},
+                                {text: `Kita disarankan melakukan hal tersebut`, correct: true},
+                                {text: `Hal tersebut berbahaya bagi tubuh`, correct: false},
+                                {text: `Tidak ada hubungannya dengan kesehatan`, correct: false}
+                            ],
                             level: "MOTS",
-                            exp: "Teks menjelaskan dampak negatif seperti dehidrasi, kurang fokus, atau gigi berlubang."
+                            exp: `Teks berisi anjuran positif tentang ${topic.title}.`
+                        },
+                        {
+                            type: 'complex',
+                            q: `Tentukan Benar/Salah mengenai informasi dalam teks.`,
+                            a: [
+                                {text: `Gagasan utama adalah ${topic.title}`, correct: 'Benar'},
+                                {text: `Informasi ini tidak penting bagi siswa`, correct: 'Salah'},
+                                {text: `Dampak positifnya adalah ${topic.key}`, correct: 'Benar'}
+                            ],
+                            level: "HOTS",
+                            exp: `Evaluasi isi teks: Topik utama, relevansi, dan manfaat.`
                         }
                     ];
-                    
-                    // Specific logic for LOTS extraction
-                    const specificQ = {
-                        q: `Salah satu manfaat yang disebutkan dalam teks adalah...`,
-                        a: topic.key,
-                        opts: [topic.key, "membuat mengantuk", "menambah berat badan", "membuat kulit gatal"],
-                        level: "LOTS",
-                        exp: `Teks secara tersurat menyebutkan manfaat: ${topic.key}.`
-                    };
-                    questions.push(specificQ);
 
                     return { title: topic.title, text: `<b>${topic.title}</b>\n\n${topic.content}`, questions: Utils.shuffle(questions)[0] };
                 }
@@ -476,7 +485,6 @@
             generateBatch: (count) => {
                 const results = [];
                 for(let i=0; i<count; i++) {
-                    // 50:50 chance between Fiction and Info
                     const isFiction = Math.random() > 0.5;
                     let data;
                     if(isFiction) {
@@ -487,11 +495,21 @@
                         data.cat = "Teks Informasi";
                     }
                     
-                    // Format output
+                    // Normalize Opts for single type
+                    let normalizedOpts = data.questions.opts;
+                    if(data.questions.type === 'single') {
+                        normalizedOpts = Utils.shuffle(data.questions.opts);
+                    } else if (data.questions.type === 'multiple') {
+                        normalizedOpts = Utils.shuffle(data.questions.a); // Use 'a' as source for options in multiple
+                    } else if (data.questions.type === 'complex') {
+                        normalizedOpts = data.questions.a; // Use 'a' as statements
+                    }
+
                     const formattedQ = {
+                        type: data.questions.type,
                         q: `<div class="reading-text">${data.text}</div><div class="font-bold text-lg text-slate-800">${data.questions.q}</div>`,
-                        ans: data.questions.a,
-                        opts: Utils.shuffle(data.questions.opts),
+                        ans: data.questions.a, // Holds correct answer structure
+                        opts: normalizedOpts, // Holds display options
                         level: data.questions.level,
                         cat: data.cat,
                         exp: data.questions.exp,
@@ -559,27 +577,15 @@
                 document.getElementById('confirmation-screen').classList.remove('hidden');
             },
 
-            // --- FUNGSI BARU UNTUK MODE AMAN ---
             enableExamMode: () => {
-                // 1. Fullscreen
                 const docElm = document.documentElement;
-                if (docElm.requestFullscreen) {
-                    docElm.requestFullscreen().catch((err) => {
-                        console.log("Fullscreen ditolak atau tidak didukung:", err);
-                    });
-                }
-
-                // 2. Disable Back Button (Manipulasi History)
+                if (docElm.requestFullscreen) { docElm.requestFullscreen().catch((err) => {}); }
                 history.pushState(null, null, location.href);
                 window.onpopstate = function () {
                     history.pushState(null, null, location.href);
                     app.showModal("Mode Ujian Aktif: Navigasi Kembali dinonaktifkan.", 'alert');
                 };
-
-                // 3. Prevent Refresh/Close Tab Warning
-                window.onbeforeunload = function() {
-                    return "Ujian sedang berlangsung. Apakah Anda yakin ingin keluar? Data mungkin hilang.";
-                };
+                window.onbeforeunload = function() { return "Ujian sedang berlangsung."; };
             },
 
             confirmData: () => {
@@ -587,21 +593,10 @@
                 const gender = document.getElementById('input-gender').value;
                 const dob = document.getElementById('input-dob').value;
                 const manualToken = document.getElementById('input-token').value.trim().toUpperCase();
-                if (!name || !gender || !dob) {
-                    app.showModal("Mohon lengkapi Nama, Jenis Kelamin, dan Tanggal Lahir!", 'alert');
-                    return;
-                }
-                if (manualToken !== app.user.token) {
-                    app.showModal("Token Ujian tidak sesuai! Mohon periksa kembali token yang tertera.", 'alert');
-                    return;
-                }
-                app.user.name = name;
-                app.user.gender = gender;
-                app.user.dob = dob;
-                
-                // AKTIFKAN MODE AMAN SAAT MULAI
+                if (!name || !gender || !dob) { app.showModal("Lengkapi data diri!", 'alert'); return; }
+                if (manualToken !== app.user.token) { app.showModal("Token salah!", 'alert'); return; }
+                app.user.name = name; app.user.gender = gender; app.user.dob = dob;
                 app.enableExamMode();
-
                 document.getElementById('confirmation-screen').classList.add('hidden');
                 document.getElementById('quiz-screen').classList.remove('hidden');
                 document.getElementById('user-info-display').classList.remove('hidden');
@@ -612,7 +607,6 @@
             },
 
             generateQuestions: () => {
-                // Generate 30 soal unik menggunakan AI Engine (Procedural Generation)
                 app.questions = QuestionGenerator.generateBatch(30);
                 app.answers = new Array(30).fill(null);
             },
@@ -635,32 +629,84 @@
                 const q = app.questions[idx];
                 document.getElementById('question-progress').innerText = `Soal ${idx+1}/30`;
                 document.getElementById('category-badge').innerText = q.competency || q.cat;
-                
                 const lvlBadge = document.getElementById('level-badge');
                 lvlBadge.innerText = q.level;
                 
-                if(q.level === 'LOTS') {
-                    lvlBadge.className = "bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider border border-green-200";
-                } else if(q.level === 'MOTS') {
-                    lvlBadge.className = "bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider border border-yellow-200";
-                } else {
-                    lvlBadge.className = "bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider border border-red-200";
-                }
+                if(q.level === 'LOTS') lvlBadge.className = "bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider border border-green-200";
+                else if(q.level === 'MOTS') lvlBadge.className = "bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider border border-yellow-200";
+                else lvlBadge.className = "bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider border border-red-200";
 
                 document.getElementById('question-text').innerHTML = q.q;
                 
-                const opts = document.getElementById('options-container');
-                opts.innerHTML = '';
-                const labels = ['A', 'B', 'C', 'D'];
-                q.opts.forEach((opt, i) => {
-                    const btn = document.createElement('button');
-                    const isSel = app.answers[idx] === opt;
-                    const label = labels[i] || '';
-                    btn.className = `w-full text-left p-3 rounded-lg border-2 transition flex items-center gap-3 ${isSel ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-blue-300 bg-white'}`;
-                    btn.innerHTML = `<div class="flex-shrink-0 h-8 w-8 rounded-full ${isSel ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'} flex items-center justify-center font-bold text-sm border ${isSel ? 'border-blue-600' : 'border-slate-300'}">${label}</div><span class="text-slate-700 font-medium">${opt}</span>`;
-                    btn.onclick = () => { app.answers[idx] = opt; app.loadQ(idx); app.updateNav(); };
-                    opts.appendChild(btn);
-                });
+                const typeHint = document.getElementById('question-type-hint');
+                const optsContainer = document.getElementById('options-container');
+                optsContainer.innerHTML = '';
+
+                // RENDER LOGIC
+                if (q.type === 'single') {
+                    typeHint.innerText = "Pilih satu jawaban yang benar.";
+                    const labels = ['A', 'B', 'C', 'D'];
+                    q.opts.forEach((opt, i) => {
+                        const btn = document.createElement('button');
+                        const isSel = app.answers[idx] === opt;
+                        btn.className = `w-full text-left p-3 rounded-lg border-2 transition flex items-center gap-3 mb-3 ${isSel ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-blue-300 bg-white'}`;
+                        btn.innerHTML = `<div class="flex-shrink-0 h-8 w-8 rounded-full ${isSel ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'} flex items-center justify-center font-bold text-sm border ${isSel ? 'border-blue-600' : 'border-slate-300'}">${labels[i]||''}</div><span class="text-slate-700 font-medium">${opt}</span>`;
+                        btn.onclick = () => { app.answers[idx] = opt; app.loadQ(idx); app.updateNav(); };
+                        optsContainer.appendChild(btn);
+                    });
+                } 
+                else if (q.type === 'multiple') {
+                    typeHint.innerText = "Pilih lebih dari satu jawaban yang benar (Kotak Centang).";
+                    const currentAns = app.answers[idx] || [];
+                    q.opts.forEach((optData, i) => {
+                        // In rendering multiple, optData has {text, correct}
+                        // We track by INDEX in the shuffled options array
+                        const isChecked = currentAns.includes(i);
+                        const div = document.createElement('label');
+                        div.className = "flex items-start p-3 border-2 rounded-lg cursor-pointer transition hover:bg-slate-50 checkbox-wrapper mb-3 " + (isChecked ? 'border-blue-500 bg-blue-50' : 'border-slate-200');
+                        div.innerHTML = `
+                            <input type="checkbox" class="hidden" ${isChecked ? 'checked' : ''}>
+                            <div class="w-6 h-6 border-2 border-slate-300 rounded flex items-center justify-center mr-3 bg-white transition">
+                                <svg class="w-4 h-4 text-white check-icon hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="text-slate-700 font-medium select-none">${optData.text}</span>
+                        `;
+                        div.querySelector('input').addEventListener('change', (e) => {
+                            let newAns = app.answers[idx] || [];
+                            if(e.target.checked) newAns.push(i);
+                            else newAns = newAns.filter(x => x !== i);
+                            app.answers[idx] = newAns;
+                            app.updateNav();
+                            div.className = "flex items-start p-3 border-2 rounded-lg cursor-pointer transition hover:bg-slate-50 checkbox-wrapper mb-3 " + (e.target.checked ? 'border-blue-500 bg-blue-50' : 'border-slate-200');
+                        });
+                        optsContainer.appendChild(div);
+                    });
+                } 
+                else if (q.type === 'complex') {
+                    typeHint.innerText = "Tentukan Benar atau Salah untuk setiap pernyataan.";
+                    const currentAns = app.answers[idx] || {};
+                    const table = document.createElement('table');
+                    table.className = "w-full text-sm border-collapse complex-table rounded-lg overflow-hidden border border-slate-200";
+                    table.innerHTML = `<thead><tr><th>Pernyataan</th><th class="w-20 text-center">Benar</th><th class="w-20 text-center">Salah</th></tr></thead><tbody></tbody>`;
+                    const tbody = table.querySelector('tbody');
+                    q.opts.forEach((item, i) => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${item.text}</td>
+                            <td class="text-center"><input type="radio" name="row-${i}" value="Benar" ${currentAns[i] === 'Benar' ? 'checked' : ''} class="w-5 h-5 text-blue-600"></td>
+                            <td class="text-center"><input type="radio" name="row-${i}" value="Salah" ${currentAns[i] === 'Salah' ? 'checked' : ''} class="w-5 h-5 text-red-600"></td>
+                        `;
+                        tr.querySelectorAll('input').forEach(radio => {
+                            radio.addEventListener('change', (e) => {
+                                if (!app.answers[idx]) app.answers[idx] = {};
+                                app.answers[idx][i] = e.target.value;
+                                app.updateNav();
+                            });
+                        });
+                        tbody.appendChild(tr);
+                    });
+                    optsContainer.appendChild(table);
+                }
                 
                 const prevBtn = document.getElementById('btn-prev');
                 const nextBtn = document.getElementById('btn-next');
@@ -701,41 +747,82 @@
             updateNav: () => {
                 for(let i=0; i<30; i++) {
                     const btn = document.getElementById(`nav-${i}`);
-                    btn.className = `h-8 w-8 rounded text-xs font-bold transition ${i === app.currIdx ? 'ring-2 ring-blue-500 bg-white' : (app.answers[i] ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600')}`;
+                    let answered = false;
+                    const ans = app.answers[i];
+                    const type = app.questions[i].type;
+                    if (type === 'single' && ans) answered = true;
+                    if (type === 'multiple' && ans && ans.length > 0) answered = true;
+                    if (type === 'complex' && ans && Object.keys(ans).length > 0) answered = true;
+                    
+                    btn.className = `h-8 w-8 rounded text-xs font-bold transition ${i === app.currIdx ? 'ring-2 ring-blue-500 bg-white' : (answered ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600')}`;
                 }
             },
 
             finishQuiz: () => {
-                app.showModal("Apakah Anda yakin ingin menyelesaikan ujian ini? Jawaban tidak dapat diubah setelah ini.", 'confirm', async () => {
+                app.showModal("Apakah Anda yakin ingin menyelesaikan ujian ini?", 'confirm', async () => {
                     clearInterval(app.timer);
-                    // Hapus listener 'beforeunload' agar bisa keluar tanpa peringatan
                     window.onbeforeunload = null; 
                     
                     let correct = 0;
-                    
                     const discussionContent = document.getElementById('discussion-content');
                     discussionContent.innerHTML = '';
 
                     app.questions.forEach((q, i) => { 
-                        const isCorrect = app.answers[i] === q.ans;
-                        if(isCorrect) correct++; 
+                        let isCorrect = false;
+                        let userAnswerDisplay = "";
+                        let keyDisplay = "";
+
+                        if (q.type === 'single') {
+                            isCorrect = app.answers[i] === q.ans;
+                            userAnswerDisplay = app.answers[i] || "-";
+                            keyDisplay = q.ans;
+                        } 
+                        else if (q.type === 'multiple') {
+                            const userAns = app.answers[i] || [];
+                            // For multiple, q.opts contains objects with {text, correct}
+                            // userAns contains indices of selected options from q.opts
+                            const selectedIndices = userAns;
+                            const correctIndices = q.opts.map((o, idx) => o.correct ? idx : -1).filter(idx => idx !== -1);
+                            
+                            const userGotAllCorrect = correctIndices.every(idx => selectedIndices.includes(idx));
+                            const userPickedNoWrong = selectedIndices.every(idx => correctIndices.includes(idx));
+                            isCorrect = userGotAllCorrect && userPickedNoWrong;
+
+                            userAnswerDisplay = selectedIndices.map(idx => q.opts[idx].text).join(", ") || "-";
+                            keyDisplay = q.opts.filter(o => o.correct).map(o => o.text).join(", ");
+                        } 
+                        else if (q.type === 'complex') {
+                            const userAns = app.answers[i] || {};
+                            let allMatch = true;
+                            let userText = [];
+                            let keyText = [];
+                            q.opts.forEach((stmt, idx) => {
+                                const uVal = userAns[idx] || "-";
+                                if (uVal !== stmt.correct) allMatch = false;
+                                userText.push(`${stmt.text.substring(0,20)}...: ${uVal}`);
+                                keyText.push(`${stmt.text.substring(0,20)}...: ${stmt.correct}`);
+                            });
+                            isCorrect = allMatch;
+                            userAnswerDisplay = `<ul class="text-xs list-disc pl-4">${userText.map(t=>`<li>${t}</li>`).join('')}</ul>`;
+                            keyDisplay = `<ul class="text-xs list-disc pl-4">${keyText.map(t=>`<li>${t}</li>`).join('')}</ul>`;
+                        }
+
+                        if(isCorrect) correct++;
                         
-                        // Generate Discussion Item HTML
                         const item = document.createElement('div');
                         item.className = `page-break mb-6 p-4 border rounded-lg ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`;
                         item.innerHTML = `
                             <div class="font-bold text-slate-700 mb-2 flex justify-between">
-                                <span>Soal ${i+1} (${q.level})</span>
+                                <span>Soal ${i+1} (${q.type === 'single' ? 'PG' : (q.type==='multiple'?'PG Kompleks':'Benar/Salah')})</span>
                                 <span class="${isCorrect ? 'text-green-600' : 'text-red-600'} text-xs font-bold uppercase border px-2 rounded ${isCorrect ? 'border-green-300 bg-green-100' : 'border-red-300 bg-red-100'}">${isCorrect ? 'Benar' : 'Salah'}</span>
                             </div>
                             <div class="mb-3 text-sm text-slate-800">${q.q}</div>
                             <div class="text-sm grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
-                                <p class="bg-white p-2 rounded border border-slate-200"><strong>Jawaban Anda:</strong> <span class="${isCorrect ? 'text-green-700 font-bold' : 'text-red-700 font-bold'}">${app.answers[i] || 'Tidak dijawab'}</span></p>
-                                <p class="bg-white p-2 rounded border border-slate-200"><strong>Kunci Jawaban:</strong> <span class="text-green-700 font-bold">${q.ans}</span></p>
+                                <div class="bg-white p-2 rounded border border-slate-200"><strong>Jawaban Anda:</strong><br>${userAnswerDisplay}</div>
+                                <div class="bg-white p-2 rounded border border-slate-200"><strong>Kunci Jawaban:</strong><br>${keyDisplay}</div>
                             </div>
                             <div class="mt-2 p-3 bg-white rounded border border-slate-300 text-sm text-slate-600 shadow-sm">
-                                <strong class="text-blue-600 block mb-1">Pembahasan:</strong>
-                                ${q.exp}
+                                <strong class="text-blue-600 block mb-1">Pembahasan:</strong>${q.exp}
                             </div>
                         `;
                         discussionContent.appendChild(item);
@@ -752,7 +839,7 @@
                         await app.saveScore(score);
                         app.loadLeaderboard();
                     } else {
-                        document.getElementById('leaderboard-body').innerHTML = '<tr><td colspan="4" class="p-4 text-center text-orange-500">Mode Offline: Data tidak disimpan ke server.</td></tr>';
+                        document.getElementById('leaderboard-body').innerHTML = '<tr><td colspan="4" class="p-4 text-center text-orange-500">Mode Offline: Data tidak disimpan.</td></tr>';
                     }
                 });
             },
@@ -768,10 +855,7 @@
                          collectionRef = collection(db, COLLECTION_NAME);
                     }
                     await addDoc(collectionRef, { 
-                        code: app.user.code, 
-                        name: app.user.name, 
-                        score: score, 
-                        timestamp: serverTimestamp() 
+                        code: app.user.code, name: app.user.name, score: score, timestamp: serverTimestamp() 
                     });
                 } catch (e) { console.error("Save Error", e); }
             },
@@ -801,7 +885,7 @@
                     document.getElementById('loading-leaderboard').classList.add('hidden');
                 }, (error) => {
                     console.error("Leaderboard Error:", error);
-                    document.getElementById('leaderboard-body').innerHTML = `<tr><td colspan="4" class="text-center text-red-500 text-xs">Gagal memuat data (Izin ditolak atau Offline).<br>Cek Console Log.</td></tr>`;
+                    document.getElementById('leaderboard-body').innerHTML = `<tr><td colspan="4" class="text-center text-red-500 text-xs">Gagal memuat data.</td></tr>`;
                 });
             }
         };
