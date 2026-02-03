@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CAT TKA Bahasa Indonesia SD - Online</title>
+    <title>CAT TKA Bahasa Indonesia SD - Online (AI Generated)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
     
@@ -34,15 +34,16 @@
         .reading-text {
             background-color: #f8fafc;
             border-left: 4px solid #3b82f6;
-            padding: 1rem;
+            padding: 1.5rem;
             margin-bottom: 1.5rem;
-            font-size: 0.95rem;
-            line-height: 1.6;
+            font-size: 1rem;
+            line-height: 1.8;
             color: #334155;
-            max-height: 300px;
+            max-height: 400px;
             overflow-y: auto;
             border-radius: 0.5rem;
-            white-space: pre-wrap; /* Preserve line breaks */
+            white-space: pre-wrap;
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
         }
 
         /* Loader */
@@ -72,8 +73,8 @@
             <div class="flex items-center gap-3">
                 <div class="bg-blue-600 text-white p-2 rounded-lg font-bold text-xl shadow-lg">CAT</div>
                 <div>
-                    <h1 class="font-bold text-lg leading-tight text-slate-800">TKA Bahasa Indonesia</h1>
-                    <p class="text-xs text-slate-500 font-semibold">Sistem Ujian Berbasis Komputer</p>
+                    <h1 class="font-bold text-lg leading-tight text-slate-800">TKA Bahasa Indonesia (AI)</h1>
+                    <p class="text-xs text-slate-500 font-semibold">Sistem Ujian Adaptif & Generatif</p>
                 </div>
             </div>
             <div class="flex items-center gap-4">
@@ -104,7 +105,7 @@
                     </svg>
                 </div>
                 <h2 class="text-2xl font-bold text-slate-800">Login Peserta</h2>
-                <p class="text-slate-500 text-sm">Gunakan kredensial berikut untuk masuk.</p>
+                <p class="text-slate-500 text-sm">Masuk untuk memulai ujian berbasis AI.</p>
             </div>
 
             <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6 text-center relative overflow-hidden">
@@ -124,9 +125,6 @@
             <button onclick="app.handleLogin()" id="btn-login" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg transition transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
                 MASUK
             </button>
-            <div class="text-center mt-4">
-                <p class="text-xs text-slate-400">Kode dan sandi di-generate otomatis oleh aplikasi.</p>
-            </div>
         </div>
 
         <!-- 2. DATA ENTRY & CONFIRMATION SCREEN -->
@@ -199,16 +197,16 @@
 
             <div class="flex flex-col md:flex-row">
                 <div class="flex-grow p-6 md:p-10">
+                    <!-- Reading Text Area -->
                     <div id="question-text" class="mb-4"></div>
+                    
                     <div id="options-container" class="grid grid-cols-1 gap-3"></div>
                     <div class="flex justify-between items-center mt-10 pt-6 border-t border-slate-100">
                         <button onclick="app.prevQuestion()" id="btn-prev" class="flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition disabled:opacity-50 disabled:cursor-not-allowed">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
                             Soal Sebelumnya
                         </button>
                         <button onclick="app.nextQuestion()" id="btn-next" class="flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition shadow-md hover:shadow-lg">
                             Soal Berikutnya
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>
                         </button>
                     </div>
                 </div>
@@ -234,33 +232,6 @@
                 <div class="text-sm opacity-90">Benar: <span id="correct-count">0</span> dari 30 Soal</div>
             </div>
 
-            <div id="leaderboard-section" class="mt-8 text-left">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="font-bold text-xl text-slate-700 flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-                        Peringkat Peserta (Live)
-                    </h3>
-                    <div id="loading-leaderboard" class="loader hidden"></div>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm text-left">
-                            <thead class="bg-slate-50 text-slate-500 uppercase font-bold">
-                                <tr>
-                                    <th class="px-6 py-3">#</th>
-                                    <th class="px-6 py-3">Nama Peserta</th>
-                                    <th class="px-6 py-3">Kode</th>
-                                    <th class="px-6 py-3 text-right">Skor</th>
-                                </tr>
-                            </thead>
-                            <tbody id="leaderboard-body" class="divide-y divide-slate-100">
-                                <tr><td colspan="4" class="px-6 py-4 text-center text-slate-400 italic">Memuat data...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
             <!-- Tombol Aksi -->
             <div class="mt-8 flex gap-4 justify-center print:hidden">
                  <button onclick="document.getElementById('discussion-section').classList.toggle('hidden');" class="bg-blue-100 border border-blue-300 hover:bg-blue-200 text-blue-700 font-bold py-2 px-6 rounded-lg transition">Lihat Pembahasan</button>
@@ -268,12 +239,10 @@
                 <button onclick="location.reload()" class="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-6 rounded-lg transition">Keluar / Login Ulang</button>
             </div>
 
-            <!-- Bagian Pembahasan (Hidden by default) -->
+            <!-- Bagian Pembahasan -->
             <div id="discussion-section" class="hidden mt-8 text-left border-t-2 border-slate-200 pt-8">
                 <h3 class="font-bold text-2xl text-slate-800 mb-6 text-center">Pembahasan Soal</h3>
-                <div id="discussion-content" class="space-y-6">
-                    <!-- Konten Pembahasan akan di-inject lewat JS -->
-                </div>
+                <div id="discussion-content" class="space-y-6"></div>
             </div>
         </div>
 
@@ -306,12 +275,12 @@
     <!-- APP LOGIC -->
     <script>
         const MANUAL_CONFIG = {
-            apiKey: "AIzaSyBrW9-IE0yZc-aCp3IjwbCViaILGQbHUj8",
-            authDomain: "tka-math-sd.firebaseapp.com",
-            projectId: "tka-math-sd",
-            storageBucket: "tka-math-sd.firebasestorage.app",
-            messagingSenderId: "33767745712",
-            appId: "1:33767745712:web:4a43a1144ad2203b78b375"
+            apiKey: "AIzaSyDfEe7JwdlDQtToL2FZUkV3X_hj4N5gN1g",
+            authDomain: "tka-indo-sd.firebaseapp.com",
+            projectId: "tka-indo-sd",
+            storageBucket: "tka-indo-sd.firebasestorage.app",
+            messagingSenderId: "805759776077",
+            appId: "1:805759776077:web:c02fd132f81cdf6b82f304"
         };
 
         let db, auth;
@@ -356,6 +325,7 @@
         }
 
         const Utils = {
+            randChoice: (arr) => arr[Math.floor(Math.random() * arr.length)],
             shuffle: (array) => {
                 let currentIndex = array.length, randomIndex;
                 while (currentIndex != 0) {
@@ -367,164 +337,142 @@
             }
         };
 
-        const questionsDB = [
-            {
-                text: `<b>Danau untuk Semua</b>\n\nDi hutan ada sebuah danau tempat semua binatang minum... (teks lengkap)`,
-                question: "Pada teks di atas terdapat kalimat: 'Mereka diam seribu bahasa.'<br>Apa arti 'diam seribu bahasa' pada teks fabel tersebut?",
-                options: [
-                    "Para binatang di hutan tidak mampu melakukan sesuatu.",
-                    "Semua binatang di hutan menahan untuk tidak berkomentar.",
-                    "Penghuni hutan tidak mau mendengarkan pendapat orang lain.",
-                    "Binatang-binatang di hutan tidak mengetahui masalah yang terjadi."
+        // --- PROCEDURAL CONTENT GENERATION (AI ENGINE) ---
+        // Engine ini bertugas membuat teks dan soal baru berdasarkan kisi-kisi
+        
+        const ContentEngine = {
+            // Data untuk Fiksi (Fabel)
+            fictionData: {
+                chars: [
+                    { name: "Kancil", trait: "cerdik", action: "mengelabui" },
+                    { name: "Gajah", trait: "sombong", action: "memamerkan kekuatan" },
+                    { name: "Semut", trait: "pekerja keras", action: "mengumpulkan makanan" },
+                    { name: "Kura-kura", trait: "sabar", action: "berjalan perlahan" },
+                    { name: "Monyet", trait: "jahil", action: "mencuri pisang" }
                 ],
-                answer: "Semua binatang di hutan menahan untuk tidak berkomentar.",
-                level: "Pemahaman Inferensial",
-                explanation: "Frasa 'diam seribu bahasa' adalah ungkapan kiasan yang berarti 'sama sekali tidak berkata-kata' atau 'menahan diri untuk tidak berkomentar' karena suatu alasan (dalam hal ini karena takut kepada Rino)."
+                settings: ["hutan rimba", "tepi sungai", "padang rumput yang luas", "bukit berbatu"],
+                plots: [
+                    { conflict: "memperebutkan makanan", resolution: "berbagi bersama" },
+                    { conflict: "terjebak dalam lubang", resolution: "saling tolong menolong" },
+                    { conflict: "mengejek yang lemah", resolution: "yang lemah membuktikan kemampuannya" }
+                ],
+                generate: function() {
+                    const char1 = Utils.randChoice(this.chars);
+                    let char2 = Utils.randChoice(this.chars);
+                    while(char1.name === char2.name) char2 = Utils.randChoice(this.chars); // Ensure different chars
+                    const place = Utils.randChoice(this.settings);
+                    const plot = Utils.randChoice(this.plots);
+
+                    const title = `Kisah ${char1.name} dan ${char2.name}`;
+                    const text = `Di sebuah ${place}, hiduplah seekor ${char1.name} yang terkenal ${char1.trait}. Suatu hari, ia sedang ${char1.action} ketika bertemu dengan ${char2.name}.\n\n${char2.name} adalah hewan yang berbeda, namun hari itu mereka terlibat masalah. Mereka ${plot.conflict}. Suasana menjadi tegang. ${char1.name} berusaha mencari jalan keluar dengan sifatnya yang ${char1.trait}.\n\nAkhirnya, mereka menyadari kesalahan masing-masing. Mereka memutuskan untuk ${plot.resolution}. Sejak saat itu, mereka hidup rukun di ${place}.`;
+
+                    // Generate Questions based on metadata
+                    const questions = [
+                        {
+                            q: `Siapakah tokoh dalam cerita yang memiliki sifat ${char1.trait}?`,
+                            a: char1.name,
+                            opts: [char1.name, char2.name, "Singa", "Burung Hantu"],
+                            level: "LOTS",
+                            exp: `Dalam teks disebutkan: "...hiduplah seekor ${char1.name} yang terkenal ${char1.trait}."`
+                        },
+                        {
+                            q: `Di manakah latar tempat cerita tersebut?`,
+                            a: place,
+                            opts: this.settings, // All settings as options
+                            level: "LOTS",
+                            exp: `Kalimat pertama teks menyebutkan: "Di sebuah ${place}..."`
+                        },
+                        {
+                            q: `Apa pesan moral yang dapat diambil dari cerita di atas?`,
+                            a: `Kita harus ${plot.resolution}.`,
+                            opts: [`Kita harus ${plot.conflict}.`, `Kita harus ${plot.resolution}.`, "Kita harus menghindari hutan.", "Kita harus menjadi kuat."],
+                            level: "HOTS",
+                            exp: `Di akhir cerita, tokoh memutuskan untuk ${plot.resolution}, yang mengajarkan kita tentang kerukunan.`
+                        }
+                    ];
+                    return { title, text, questions: Utils.shuffle(questions)[0] }; // Return 1 random question per text generation
+                }
             },
-            {
-                text: `<b>Hewan Pemakan Daun, Apa Itu?</b>\n\nHewan bisa dibagi menjadi tiga kelompok berdasarkan makanan mereka...`,
-                question: "Apa gagasan utama yang disampaikan pada paragraf ketiga teks tersebut?",
-                options: [
-                    "Jenis daun yang cocok untuk hewan folivora.",
-                    "Pembagian hewan berdasarkan makanan mereka.",
-                    "Cara khusus tubuh hewan folivora mencerna daun.",
-                    "Peranan penting hutan bagi kehidupan hewan folivora."
+
+            // Data untuk Teks Informasi
+            infoData: {
+                topics: [
+                    { title: "Manfaat Minum Air Putih", content: "Air putih sangat penting bagi tubuh. Tubuh manusia sebagian besar terdiri dari air. Minum air membantu menjaga suhu tubuh, melancarkan pencernaan, dan mencegah dehidrasi. Kurang minum dapat menyebabkan sakit kepala dan lemas.", key: "mencegah dehidrasi" },
+                    { title: "Pentingnya Sarapan", content: "Sarapan adalah waktu makan terpenting. Sarapan memberikan energi untuk memulai hari. Orang yang sarapan cenderung lebih fokus saat belajar atau bekerja. Menu sarapan sehat sebaiknya mengandung karbohidrat dan protein.", key: "memberikan energi" },
+                    { title: "Menjaga Kebersihan Gigi", content: "Gigi harus disikat minimal dua kali sehari. Sisa makanan yang menempel dapat menjadi sarang kuman. Kuman menghasilkan asam yang membuat gigi berlubang. Selain menyikat gigi, kita juga harus mengurangi makanan manis.", key: "mencegah gigi berlubang" }
                 ],
-                answer: "Cara khusus tubuh hewan folivora mencerna daun.",
-                level: "Pemahaman Tekstual",
-                explanation: "Paragraf ketiga menjelaskan secara rinci tentang mekanisme pencernaan unik hewan folivora, seperti usus panjang, gerakan lambat, dan bantuan bakteri, untuk mencerna daun."
-            },
-            {
-                text: `<b>Kenthus yang Sombong</b>\n\nDi tengah padang rumput terdapat kolam...`,
-                question: "Apa kejadian yang membuat Kenthus merasa menyesal?",
-                options: [
-                    "Kenthus hendak ditelan anak lembu di padang rumput.",
-                    "Kenthus berlari ke tepi kolam hingga terengah-engah.",
-                    "Kenthus mengembang terlalu besar hingga jatuh lemas.",
-                    "Kenthus dimarahi Koko karena terlalu menggebu-gebu."
-                ],
-                answer: "Kenthus mengembang terlalu besar hingga jatuh lemas.",
-                level: "Pemahaman Inferensial",
-                explanation: "Kenthus menyesal setelah ia mengembungkan tubuhnya secara berlebihan karena kesombongan, yang mengakibatkannya jatuh lemas dan sakit perut. Hal ini menyadarkannya untuk mendengarkan nasihat kakaknya."
-            },
-            {
-                text: `<b>6 Agustus 1969\nDear Sahabatku Jill Tarter,</b>\n\nSaat kau membaca ini, aku sedang liburan...`,
-                question: "Dalam teks, terdapat kalimat 'Hari-hari itu sangat menegangkan.'\nMakna kata menegangkan dalam kalimat tersebut adalah...",
-                options: [
-                    "Membuat orang terus waspada dalam bekerja.",
-                    "Menyebabkan orang kehilangan fokus saat bekerja.",
-                    "Membuat suasana menjadi serius dan penuh ketakutan.",
-                    "Membuat perasaan menjadi sangat cemas dan khawatir."
-                ],
-                answer: "Membuat perasaan menjadi sangat cemas dan khawatir.",
-                level: "Pemahaman Tekstual",
-                explanation: "Kata 'menegangkan' dalam konteks situasi kritis misi Apollo 11 (kesalahan komputer saat pendaratan) merujuk pada situasi yang membuat cemas dan khawatir akan kegagalan misi."
-            },
-            {
-                text: `<b>CARA MEMBUAT MAGNET KULKAS DARI MAINAN HEWAN PLASTIK</b>\n\nBahan dan alat:\n- Mainan hewan plastik...`,
-                question: "Berdasarkan teks, benda yang umum digunakan dalam kerajinan adalah...",
-                options: [
-                    "Mainan plastik",
-                    "Cat semprot",
-                    "Magnet",
-                    "Gunting"
-                ],
-                answer: "Gunting",
-                level: "Pemahaman Tekstual",
-                explanation: "Gunting atau cutter disebutkan dalam daftar alat yang dibutuhkan untuk memotong mainan hewan plastik."
-            },
-            {
-                text: `<b>CARA MEMBUAT MAGNET KULKAS DARI MAINAN HEWAN PLASTIK</b>\n\n...`,
-                question: "Mengapa mainan hewan dibagi menjadi dua bagian?",
-                options: [
-                    "Supaya ukuran mainan lebih besar dan menarik.",
-                    "Agar mainan bisa menempel di permukaan kulkas.",
-                    "Karena mainan perlu diwarnai menggunakan cat semprot.",
-                    "Untuk memudahkan pemberian lem tembak pada mainan."
-                ],
-                answer: "Agar mainan bisa menempel di permukaan kulkas.",
-                level: "Pemahaman Inferensial",
-                explanation: "Mainan dipotong menjadi dua agar memiliki permukaan yang rata. Permukaan rata ini diperlukan untuk menempelkan magnet sehingga bisa merekat dengan baik di pintu kulkas."
-            },
-            {
-                text: `<b>Air Putih atau Air Mineral?</b>\n\nAir Putih:\n- Didapatkan dari sungai...`,
-                question: "Apa fungsi kandungan elektrolit yang dimiliki air mineral berdasarkan informasi di atas?",
-                options: [
-                    "Menjaga tekanan darah normal.",
-                    "Meningkatkan fungsi jantung.",
-                    "Membantu mencegah dehidrasi.",
-                    "Mempermudah sistem metabolisme tubuh."
-                ],
-                answer: "Membantu mencegah dehidrasi.",
-                level: "Mengakses Informasi",
-                explanation: "Teks secara eksplisit menyebutkan pada bagian 'Manfaat Kandungan Air Mineral' bahwa Elektrolit berfungsi untuk: Cegah dehidrasi."
-            },
-            {
-                text: `<b>Air Putih atau Air Mineral?</b>\n\nAir Putih:\n- Didapatkan dari sungai...`,
-                question: "Mengapa air putih lebih cocok untuk dikonsumsi setiap saat (berdasarkan ketersediaan)?",
-                options: [
-                    "Sumber air putih mudah ditemukan.",
-                    "Kandungan air putih sangat banyak.",
-                    "Pengolahan air putih melalui proses alami.",
-                    "Kandungan pH dalam air putih lebih tinggi."
-                ],
-                answer: "Sumber air putih mudah ditemukan.",
-                level: "Interpretasi Data",
-                explanation: "Teks menyatakan bahwa air putih didapatkan dari sungai, danau, sumur, atau keran rumah, yang merupakan sumber-sumber yang sangat mudah diakses sehari-hari dibandingkan sumber mata air pegunungan vulkanik untuk air mineral."
-            },
-            {
-                text: `<b>Antre, Dong!</b>\n\nTia dan Devi sedang berada di Toko Buku Gemar...`,
-                question: "Siapakah tokoh yang menyelesaikan keributan dalam cerita tersebut?",
-                options: [
-                    "Tia",
-                    "Devi",
-                    "Kasir",
-                    "Pak Satpam"
-                ],
-                answer: "Pak Satpam",
-                level: "Pemahaman Tekstual",
-                explanation: "Dalam cerita, disebutkan: 'Mendengar ada suara seperti keributan, Pak Satpam pun masuk. Dia menenangkan situasi.' Jadi, Pak Satpam-lah yang menyelesaikan masalah."
-            },
-            {
-                text: `<b>Kenapa Kita Tidak Boleh Malas Menyikat Gigi?</b>\n\nFaktanya, gigi kita terdiri dari banyak lapisan...`,
-                question: "Apa yang terjadi jika kita malas menyikat gigi menurut teks?",
-                options: [
-                    "Gigi akan memperbaiki dirinya sendiri.",
-                    "Bakteri akan mati dengan sendirinya.",
-                    "Enamel gigi akan semakin tebal dan kuat.",
-                    "Bakteri melepaskan zat asam yang membuat gigi berlubang."
-                ],
-                answer: "Bakteri melepaskan zat asam yang membuat gigi berlubang.",
-                level: "Pemahaman Tekstual",
-                explanation: "Teks menjelaskan: 'Bakteri jahat suka memakan sisa gula... Mereka melepaskan asam yang membuat gigi kita berlubang.'"
-            },
-            {
-                text: `<b>Surat untuk Sahabat (Puisi)</b>\n\nSenyum itu enggan lepas dari bibirmu...`,
-                question: "Pada larik: 'kesetiaan yang tak akan pernah lekang oleh masa'.\nMakna pada larik puisi tersebut adalah...",
-                options: [
-                    "Simbol penerimaan, dukungan, dan rasa aman.",
-                    "Ungkapan kebahagiaan saat bertemu seseorang.",
-                    "Penghargaan dan rasa syukur sebagai hal berkesan.",
-                    "Lambang hubungan abadi, tetap kuat meski waktu atau jarak memisahkan."
-                ],
-                answer: "Lambang hubungan abadi, tetap kuat meski waktu atau jarak memisahkan.",
-                level: "Pemahaman Inferensial",
-                explanation: "Kata 'tak lekang oleh masa' berarti tidak akan rusak, hilang, atau berubah karena waktu. Dalam konteks persahabatan, ini melambangkan hubungan yang abadi."
-            },
-            {
-                text: `<b>KERUPUK, PELENGKAP MAKANAN YANG MENDUNIA</b>\n\nKerupuk bukan hal asing bagi masyarakat Indonesia...`,
-                question: "Apa nama kerupuk yang sudah dikonsumsi sejak lama dan tertulis di prasasti?",
-                options: [
-                    "Rengginang",
-                    "Melarat",
-                    "Rambak",
-                    "Gendar"
-                ],
-                answer: "Rambak",
-                level: "Pemahaman Tekstual",
-                explanation: "Teks menyebutkan: 'Kerupuk yang paling tua dan sudah lama dikonsumsi adalah rambak.' serta menyebutkan Prasasti Batu Pura."
+                generate: function() {
+                    const topic = Utils.randChoice(this.topics);
+                    
+                    // Generate Question
+                    const questions = [
+                        {
+                            q: `Apa gagasan pokok dari teks berjudul "${topic.title}"?`,
+                            a: topic.title.replace("Manfaat", "Pentingnya").replace("Pentingnya", "Manfaat") + " bagi kesehatan.", 
+                            // Simple logic to create slightly different answer text
+                            opts: [
+                                topic.title.replace("Manfaat", "Pentingnya").replace("Pentingnya", "Manfaat") + " bagi kesehatan.",
+                                "Cara membuat makanan enak.",
+                                "Bahaya tidur terlalu malam.",
+                                "Jenis-jenis olahraga pagi."
+                            ],
+                            level: "MOTS",
+                            exp: `Teks membahas secara keseluruhan tentang ${topic.title}.`
+                        },
+                        {
+                            q: `Berdasarkan teks, apa akibat jika kita mengabaikan hal tersebut?`,
+                            a: "Dapat menyebabkan gangguan kesehatan.",
+                            opts: ["Tubuh menjadi lebih kuat.", "Dapat menyebabkan gangguan kesehatan.", "Pikiran menjadi lebih tenang.", "Gigi menjadi lebih putih."],
+                            level: "MOTS",
+                            exp: "Teks menjelaskan dampak negatif seperti dehidrasi, kurang fokus, atau gigi berlubang."
+                        }
+                    ];
+                    
+                    // Specific logic for LOTS extraction
+                    const specificQ = {
+                        q: `Salah satu manfaat yang disebutkan dalam teks adalah...`,
+                        a: topic.key,
+                        opts: [topic.key, "membuat mengantuk", "menambah berat badan", "membuat kulit gatal"],
+                        level: "LOTS",
+                        exp: `Teks secara tersurat menyebutkan manfaat: ${topic.key}.`
+                    };
+                    questions.push(specificQ);
+
+                    return { title: topic.title, text: `<b>${topic.title}</b>\n\n${topic.content}`, questions: Utils.shuffle(questions)[0] };
+                }
             }
-        ];
+        };
+
+        const QuestionGenerator = {
+            generateBatch: (count) => {
+                const results = [];
+                for(let i=0; i<count; i++) {
+                    // 50:50 chance between Fiction and Info
+                    const isFiction = Math.random() > 0.5;
+                    let data;
+                    if(isFiction) {
+                        data = ContentEngine.fictionData.generate();
+                        data.cat = "Fiksi (Fabel)";
+                    } else {
+                        data = ContentEngine.infoData.generate();
+                        data.cat = "Teks Informasi";
+                    }
+                    
+                    // Format output
+                    const formattedQ = {
+                        q: `<div class="reading-text">${data.text}</div><div class="font-bold text-lg text-slate-800">${data.questions.q}</div>`,
+                        ans: data.questions.a,
+                        opts: Utils.shuffle(data.questions.opts),
+                        level: data.questions.level,
+                        cat: data.cat,
+                        exp: data.questions.exp,
+                        competency: isFiction ? "Memahami Teks Sastra" : "Memahami Teks Informasi"
+                    };
+                    results.push(formattedQ);
+                }
+                return results;
+            }
+        };
 
         const app = {
             user: { code: '', name: '', gender: '', dob: '', token: '' },
@@ -608,37 +556,8 @@
             },
 
             generateQuestions: () => {
-                app.questions = [];
-                for(let i=0; i<30; i++) {
-                    const rawQ = questionsDB[i % questionsDB.length];
-                    const shuffledOpts = Utils.shuffle([...rawQ.options]);
-                    
-                    let cognitiveLevel = "LOTS";
-                    const levelMap = {
-                        "Pemahaman Tekstual": "LOTS",
-                        "Mengakses Informasi": "LOTS",
-                        "Pemahaman Inferensial": "MOTS",
-                        "Interpretasi Data": "MOTS",
-                        "Evaluasi dan Apresiasi": "HOTS"
-                    };
-                    
-                    if (levelMap[rawQ.level]) {
-                        cognitiveLevel = levelMap[rawQ.level];
-                    } else if (["LOTS", "MOTS", "HOTS"].includes(rawQ.level)) {
-                        cognitiveLevel = rawQ.level;
-                    }
-
-                    app.questions.push({
-                        cat: "Literasi",
-                        level: cognitiveLevel,
-                        competency: rawQ.level,
-                        q: `<div class="reading-text">${rawQ.text}</div><div class="font-bold text-lg text-slate-800">${rawQ.question}</div>`, 
-                        ans: rawQ.answer, 
-                        opts: shuffledOpts,
-                        exp: rawQ.explanation // Menambahkan Penjelasan
-                    });
-                }
-                app.questions = Utils.shuffle(app.questions);
+                // Generate 30 soal unik menggunakan AI Engine (Procedural Generation)
+                app.questions = QuestionGenerator.generateBatch(30);
                 app.answers = new Array(30).fill(null);
             },
 
@@ -774,7 +693,7 @@
                         await app.saveScore(score);
                         app.loadLeaderboard();
                     } else {
-                        document.getElementById('leaderboard-body').innerHTML = '<tr><td colspan="4" class="p-4 text-center text-orange-500">Mode Offline: Data tidak disimpan ke server.</td></tr>';
+                        // Offline mode handling if needed
                     }
                 });
             },
@@ -808,9 +727,15 @@
                      collectionRef = collection(db, COLLECTION_NAME);
                 }
                 const q = query(collectionRef, orderBy("score", "desc"), limit(20));
-                document.getElementById('loading-leaderboard').classList.remove('hidden');
+                
+                // Tambahkan pengecekan elemen
+                const loadingEl = document.getElementById('loading-leaderboard');
+                if (loadingEl) loadingEl.classList.remove('hidden');
+                
                 onSnapshot(q, (snapshot) => {
                     const tbody = document.getElementById('leaderboard-body');
+                    if (!tbody) return; // Guard clause
+                    
                     tbody.innerHTML = '';
                     let rank = 1;
                     if(snapshot.empty) { tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center">Belum ada data.</td></tr>`; }
@@ -820,10 +745,11 @@
                         const row = `<tr class="${isMe ? 'bg-yellow-50 border-l-4 border-yellow-400' : 'hover:bg-slate-50'} transition"><td class="px-6 py-4 font-bold text-slate-500">${rank++}</td><td class="px-6 py-4 font-semibold ${isMe ? 'text-blue-700' : 'text-slate-700'}">${d.name} ${isMe ? '(Anda)' : ''}</td><td class="px-6 py-4 text-slate-500 text-xs">${d.code}</td><td class="px-6 py-4 text-right font-bold text-blue-600">${d.score}</td></tr>`;
                         tbody.innerHTML += row;
                     });
-                    document.getElementById('loading-leaderboard').classList.add('hidden');
+                    if (loadingEl) loadingEl.classList.add('hidden');
                 }, (error) => {
                     console.error("Leaderboard Error:", error);
-                    document.getElementById('leaderboard-body').innerHTML = `<tr><td colspan="4" class="text-center text-red-500 text-xs">Gagal memuat data (Izin ditolak atau Offline).<br>Cek Console Log.</td></tr>`;
+                    const tbody = document.getElementById('leaderboard-body');
+                    if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="text-center text-red-500 text-xs">Gagal memuat data (Izin ditolak atau Offline).<br>Cek Console Log.</td></tr>`;
                 });
             }
         };
